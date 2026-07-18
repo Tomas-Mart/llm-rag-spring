@@ -1,0 +1,23 @@
+# Compiled files
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Logs
+logs/
+*.log
+
+# Local config
+application-local.yml
+.env
+
+# OS
+.DS_Store
+Thumbs.db

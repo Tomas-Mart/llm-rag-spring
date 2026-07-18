@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: llm-rag-spring
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/rag_db
+    username: rag_user
+    password: rag_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5-coder:7b
+          temperature: 0.2
+          num-ctx: 8192
+      embedding:
+        options:
+          model: nomic-embed-text:v1.5
+
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE
+        dimensions: 768
+        table-name: vector_store
+        drop-table: false
+
+logging:
+  level:
+    org.springframework.ai: DEBUG
