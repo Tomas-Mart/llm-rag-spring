@@ -1,3 +1,4 @@
+# .github/workflows/ci-cd.yml
 name: CI/CD Pipeline
 
 on:
@@ -6,22 +7,33 @@ on:
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'  # Ежедневный запуск в 2:00 (PRO-практика)
 
 env:
   JAVA_VERSION: '21'
   MAVEN_OPTS: '-Xmx2048m'
   DOCKER_REGISTRY: ghcr.io
+  SONAR_ORGANIZATION: 'tomas-mart'
+  SONAR_PROJECT_KEY: 'Tomas-Mart_llm-rag-spring'
+
+# PRO: Concurrency для предотвращения параллельных запусков
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ============================================
   # 1. СБОРКА
   # ============================================
   build:
-    name: Build
+    name: 🔨 Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -29,6 +41,13 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
 
       - name: Build with Maven
         run: mvn clean compile -DskipTests
@@ -40,12 +59,13 @@ jobs:
           path: |
             target/classes/
             target/generated-sources/
+          retention-days: 1
 
   # ============================================
   # 2. UNIT ТЕСТЫ
   # ============================================
   unit-tests:
-    name: Unit Tests
+    name: 🧪 Unit Tests
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -74,6 +94,7 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+          retention-days: 7
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
@@ -82,12 +103,15 @@ jobs:
           name: Unit Tests
           path: target/surefire-reports/*.xml
           reporter: java-junit
+          fail-on-error: false
+          list-tests: 'failed'
+          max-annotations: 10
 
   # ============================================
-  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ (с Testcontainers)
+  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ
   # ============================================
   integration-tests:
-    name: Integration Tests
+    name: 🔗 Integration Tests
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -100,6 +124,13 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Start Testcontainers
+        run: |
+          docker pull postgres:16-alpine &
+          docker pull redis:7-alpine &
+          docker pull apache/kafka:3.7.0 &
+          wait
 
       - name: Run Integration Tests
         run: |
@@ -117,6 +148,7 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+          retention-days: 7
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
@@ -125,12 +157,15 @@ jobs:
           name: Integration Tests
           path: target/surefire-reports/*.xml
           reporter: java-junit
+          fail-on-error: false
+          list-tests: 'failed'
+          max-annotations: 10
 
   # ============================================
   # 4. PERFORMANCE ТЕСТЫ
   # ============================================
   performance-tests:
-    name: Performance Tests
+    name: ⚡ Performance Tests
     runs-on: ubuntu-latest
     needs: build
     continue-on-error: true
@@ -161,6 +196,7 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+          retention-days: 7
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
@@ -169,14 +205,18 @@ jobs:
           name: Performance Tests
           path: target/surefire-reports/*.xml
           reporter: java-junit
+          fail-on-error: false
+          list-tests: 'failed'
+          max-annotations: 10
 
   # ============================================
-  # 5. STATIC ANALYSIS (SonarCloud)
+  # 5. SONARCLOUD
   # ============================================
   sonarcloud:
-    name: SonarCloud Analysis
+    name: 📊 SonarCloud
     runs-on: ubuntu-latest
     needs: [ unit-tests, integration-tests ]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -201,7 +241,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn sonar:sonar -Pci
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }} \
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} \
+            -Dsonar.host.url=https://sonarcloud.io
 
       - name: Upload Sonar report
         uses: actions/upload-artifact@v4
@@ -209,15 +253,24 @@ jobs:
         with:
           name: sonar-report
           path: target/sonar/
+          retention-days: 7
+
+      - name: Check Quality Gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          scanMetadataReportFile: target/sonar/report-task.txt
 
   # ============================================
   # 6. DOCKER BUILD & PUSH
   # ============================================
   docker-build:
-    name: Docker Build & Push
+    name: 🐳 Docker Build
     runs-on: ubuntu-latest
     needs: [ sonarcloud ]
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     permissions:
       packages: write
       contents: read
@@ -240,6 +293,7 @@ jobs:
         with:
           name: app-jar
           path: target/*.jar
+          retention-days: 1
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -248,7 +302,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set Docker tags
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -258,6 +312,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=short
+            type=raw,value={{date 'YYYYMMDD'}}.{{sha}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -266,12 +321,28 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:${{ steps.meta.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   # ============================================
   # 7. DEPLOY TO DEV
   # ============================================
   deploy-dev:
-    name: Deploy to Dev
+    name: 🚀 Deploy to Dev
     runs-on: ubuntu-latest
     needs: docker-build
     if: github.ref == 'refs/heads/develop'
@@ -282,26 +353,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
       - name: Deploy to Dev
+        env:
+          SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          SSH_USER: ${{ secrets.DEV_USER }}
+          SSH_HOST: ${{ secrets.DEV_HOST }}
         run: |
-          echo "Deploying to development environment..."
+          echo "🚀 Deploying to development environment..."
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} \
-            "docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest && \
-             docker-compose -f /opt/app/docker-compose.yml up -d --no-deps --build app"
+          
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'EOF'
+            docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest
+            docker-compose -f /opt/app/docker-compose.yml up -d --no-deps --build app
+            docker system prune -f
+          EOF
 
       - name: Health check
         run: |
+          echo "⏳ Waiting for application to start..."
           sleep 30
           curl -f https://dev.llm-rag-spring.example.com/actuator/health || exit 1
+          echo "✅ Application is healthy!"
 
   # ============================================
   # 8. DEPLOY TO PRODUCTION (Manual)
   # ============================================
   deploy-prod:
-    name: Deploy to Production
+    name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
     needs: [ docker-build, deploy-dev ]
     if: github.ref == 'refs/heads/main'
@@ -312,17 +395,55 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
+
       - name: Deploy to Production
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_USER: ${{ secrets.PROD_USER }}
+          SSH_HOST: ${{ secrets.PROD_HOST }}
         run: |
-          echo "Deploying to production environment..."
+          echo "🚀 Deploying to production environment..."
           mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} \
-            "docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest && \
-             docker-compose -f /opt/app/docker-compose.yml up -d --no-deps --build app"
+          
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST << 'EOF'
+            docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest
+            docker-compose -f /opt/app/docker-compose.yml up -d --no-deps --build app
+            docker system prune -f
+          EOF
 
       - name: Health check
         run: |
+          echo "⏳ Waiting for application to start..."
           sleep 30
           curl -f https://llm-rag-spring.example.com/actuator/health || exit 1
+          echo "✅ Application is healthy!"
+
+  # ============================================
+  # 9. NOTIFICATIONS (PRO-фича)
+  # ============================================
+  notify:
+    name: 📨 Notifications
+    runs-on: ubuntu-latest
+    needs: [ build, unit-tests, integration-tests, sonarcloud, docker-build, deploy-dev, deploy-prod ]
+    if: always()
+    steps:
+      - name: Send notification to Slack
+        uses: rtCamp/action-slack-notify@v2
+        if: github.event_name != 'pull_request'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_ICON: https://github.com/github.png
+          SLACK_USERNAME: GitHub Actions
+          SLACK_TITLE: |
+            ${{ job.status == 'success' && '✅' || '❌' }} Build ${{ job.status }}
+          SLACK_MESSAGE: |
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Status: ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.event.head_commit.author.name }}
+            URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
