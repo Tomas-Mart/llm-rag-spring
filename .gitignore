@@ -9,15 +9,146 @@ target/
 .settings/
 .project
 .classpath
+*.iws
+*.ipr
+out/
+.idea_modules/
+.atom/
+.buildpath/
+*.code-workspace
+.vscode-test/
 
 # Logs
 logs/
 *.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Local config
 application-local.yml
 .env
+.env.local
+.env.*.local
 
 # OS
 .DS_Store
 Thumbs.db
+.AppleDouble
+.LSOverride
+._*
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.directory
+
+# Maven local repository
+**/.m2/
+.m2/
+~/.m2/
+
+# Test reports
+.allure/
+allure-results/
+allure-report/
+test-output/
+surefire-reports/
+failsafe-reports/
+coverage/
+*.cover
+
+# Backups and archives
+*.tar.gz
+*.tar
+*.zip
+*.7z
+ollama_backup.tar.gz
+*.backup
+*.bak
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Local scripts
+run-offline.sh
+test-app.sh
+*.local.sh
+
+# Docker
+docker-data/
+volumes/
+*.pid
+docker-compose.override.yml
+.dockerignore
+
+# Spring Boot devtools
+spring-boot-devtools.properties
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# Application specific
+*.db
+*.db-shm
+*.db-wal
+*.h2.db
+*.mv.db
+*.trace.db
+*.lock
+*.seed
+*.pid.lock
+ollama/
+data/
+uploads/
+temp/
+tmp/
+
+# Secret files
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.pem
+*.crt
+*.key
+*.p8
+
+# Test artifacts
+*.test
+*.it
+target/surefire-reports/
+target/failsafe-reports/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Generated files
+.history/
+.nyc_output/
+out/
+dist/

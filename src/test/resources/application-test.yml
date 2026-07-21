@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: llm-rag-spring-test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  flyway:
+    enabled: false
+
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5-coder:7b
+          temperature: 0.2
+          num-ctx: 4096
+      embedding:
+        options:
+          model: nomic-embed-text:v1.5
+
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: EUCLIDEAN_DISTANCE
+        dimensions: 768
+        table-name: vector_store
+        drop-table: true
+
+logging:
+  level:
+    org.springframework.ai: DEBUG
+    org.springframework.jdbc: DEBUG
+    org.hibernate.SQL: DEBUG
+    com.example.rag: DEBUG
