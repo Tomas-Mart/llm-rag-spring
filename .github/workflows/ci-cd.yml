@@ -125,8 +125,10 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Start Testcontainers
+      - name: Pull test images
         run: |
+          docker pull pgvector/pgvector:pg16 || true
+          docker pull ollama/ollama:latest || true
           docker pull postgres:16-alpine &
           docker pull redis:7-alpine &
           docker pull apache/kafka:3.7.0 &
@@ -428,7 +430,7 @@ jobs:
   notify:
     name: 📨 Notifications
     runs-on: ubuntu-latest
-    needs: [ build, unit-tests, integration-tests, sonarcloud, docker-build, deploy-dev, deploy-prod ]
+    needs: [ build, unit-tests, integration-tests, performance-tests, sonarcloud, docker-build, deploy-dev, deploy-prod ]
     if: always()
     steps:
       - name: Send notification to Slack
