@@ -82,6 +82,7 @@
                 <spring.profiles.active>test</spring.profiles.active>
             </properties>
         </profile>
+
         <profile>
             <id>dev</id>
             <properties>
@@ -91,17 +92,41 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
         </profile>
+
         <profile>
             <id>prod</id>
             <properties>
                 <spring.profiles.active>prod</spring.profiles.active>
             </properties>
         </profile>
+
         <profile>
             <id>integration-tests</id>
             <properties>
                 <skipITs>false</skipITs>
             </properties>
+        </profile>
+
+        <!-- Профиль для SonarCloud -->
+        <profile>
+            <id>sonarcloud</id>
+            <properties>
+                <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+                <sonar.organization>tomas-mart</sonar.organization>
+                <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
+            </properties>
+        </profile>
+
+        <!-- Профиль для локального SonarQube -->
+        <profile>
+            <id>sonar-local</id>
+            <properties>
+                <sonar.host.url>http://localhost:9000</sonar.host.url>
+                <sonar.projectKey>llm-rag-spring-local</sonar.projectKey>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
         </profile>
     </profiles>
 
