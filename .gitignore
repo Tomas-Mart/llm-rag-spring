@@ -151,4 +151,5 @@ gradle-app.setting
 .history/
 .nyc_output/
 out/
-dist/
+dist/C:/Users/*/.m2/
+ollama_backup.tar.gz
