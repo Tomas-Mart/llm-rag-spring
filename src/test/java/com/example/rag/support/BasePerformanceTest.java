@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.rag.Application;
+import com.example.rag.repository.DocumentRepository;
 import com.example.rag.service.DocumentIngestionService;
 import com.example.rag.service.RagService;
 
@@ -28,6 +29,9 @@ public abstract class BasePerformanceTest {
 
     @Autowired
     protected DocumentIngestionService ingestionService;
+
+    @Autowired
+    protected DocumentRepository documentRepository;
 
     @MockBean
     protected RagService ragService;

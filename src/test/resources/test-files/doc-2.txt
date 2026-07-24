@@ -1,1 +1,3 @@
-Document 2 for batch testing.
+Document 2: Vector Databases in RAG
+Vector databases are essential for RAG applications.
+They store embeddings and enable semantic search.

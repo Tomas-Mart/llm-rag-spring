@@ -1,1 +1,2 @@
-Concurrent test document.
+Concurrent test document for multi-threaded ingestion testing.
+Used to verify thread-safety of the document ingestion service.

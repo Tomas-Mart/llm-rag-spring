@@ -1,1 +1,3 @@
-Document 3 for batch testing.
+Document 3: RAG Architecture Overview
+RAG combines retrieval and generation for better results.
+It uses vector search to find relevant context.

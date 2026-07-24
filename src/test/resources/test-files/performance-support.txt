@@ -1,1 +1,2 @@
-Performance test document.
+Performance test document for measuring ingestion speed.
+This document is used to test the performance of the ingestion service.

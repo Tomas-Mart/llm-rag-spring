@@ -42,7 +42,7 @@ import com.example.rag.Application;
  * @since 1.0
  */
 @SpringBootTest(classes = Application.class)
-@ActiveProfiles("test")
+@ActiveProfiles("integration-test")
 @Testcontainers
 public abstract class BaseIntegrationTestWithContainers {
 
@@ -67,7 +67,7 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withDatabaseName("rag_db")
                     .withUsername("rag_user")
                     .withPassword("rag_pass")
-                    .withInitScript("init-vector.sql");
+                    .withInitScript("init-pgvector.sql");
 
     /**
      * Контейнер Ollama.
@@ -94,8 +94,23 @@ public abstract class BaseIntegrationTestWithContainers {
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
         registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.jpa.properties.hibernate.dialect",
+                () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.jpa.show-sql", () -> "true");
+
+        registry.add("spring.flyway.enabled", () -> "false");
+
         registry.add("spring.ai.ollama.base-url", () ->
                 "http://localhost:" + OLLAMA_CONTAINER.getMappedPort(11434));
+
+        registry.add("spring.ai.vectorstore.pgvector.index-type", () -> "HNSW");
+        registry.add("spring.ai.vectorstore.pgvector.distance-type", () -> "EUCLIDEAN_DISTANCE");
+        registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> "768");
+        registry.add("spring.ai.vectorstore.pgvector.table-name", () -> "vector_store");
+        registry.add("spring.ai.vectorstore.pgvector.drop-table", () -> "true");
     }
 
     /**

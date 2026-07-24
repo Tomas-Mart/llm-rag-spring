@@ -46,20 +46,30 @@ class RagServiceIntegrationTest extends BaseIntegrationTestWithContainers {
     @Severity(SeverityLevel.CRITICAL)
     @TmsLink("RAG-123")
     void testAskQuestionWithRealOllama() {
+        // Проверяем что PostgreSQL запущен
+        assertThat(isPostgresRunning())
+                .as("PostgreSQL should be running")
+                .isTrue();
+
         // Пропускаем если Ollama не доступен
         if (!isOllamaRunning()) {
-            System.out.println("⚠️ Ollama не запущен, пропускаем тест");
+            logger.warn("⚠️ Ollama не запущен, пропускаем тест");
             return;
         }
+
+        logger.info("🤖 Ollama is running on port: {}", getOllamaPort());
 
         String question = "What is a vector database?";
         String answer = ragService.ask(question);
 
         assertThat(answer)
                 .isNotNull()
-                .isNotEmpty();
-        System.out.println("✅ Интеграционный тест пройден");
-        System.out.println("📝 Вопрос: " + question);
-        System.out.println("📝 Ответ: " + answer);
+                .isNotEmpty()
+                .doesNotContain("Error")
+                .doesNotContain("Exception");
+
+        logger.info("✅ Интеграционный тест пройден");
+        logger.info("📝 Вопрос: {}", question);
+        logger.info("📝 Ответ: {}", answer.substring(0, Math.min(answer.length(), 200)) + "...");
     }
 }

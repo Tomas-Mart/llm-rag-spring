@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,6 +67,15 @@ class DocumentIngestionServicePerformanceTest extends BasePerformanceTest {
      */
     @Autowired
     private DocumentIngestionService ingestionService;
+
+    /**
+     * Очищает репозиторий перед каждым тестом.
+     */
+    @BeforeEach
+    void setUp() {
+        documentRepository.deleteAll();
+        logger.info("🧹 Repository cleared for performance test");
+    }
 
     /**
      * Проверяет производительность загрузки больших документов.

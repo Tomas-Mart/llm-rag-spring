@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
@@ -22,6 +23,7 @@ import io.qameta.allure.Story;
 import io.qameta.allure.TmsLink;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * Интеграционный тест для проверки загрузки документов с использованием Testcontainers.
@@ -67,6 +69,15 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
     }
 
     /**
+     * Очищает репозиторий перед каждым тестом.
+     */
+    @BeforeEach
+    void setUp() {
+        documentRepository.deleteAll();
+        logger.info("🧹 Repository cleared for test");
+    }
+
+    /**
      * Проверяет загрузку документа с интеграционным тестированием.
      *
      * @throws Exception если ошибка при создании файла
@@ -77,6 +88,13 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
     @Severity(SeverityLevel.CRITICAL)
     @TmsLink("RAG-006")
     void testIngestDocument_Integration() throws Exception {
+        // Проверяем что PostgreSQL запущен
+        assertThat(isPostgresRunning())
+                .as("PostgreSQL container should be running")
+                .isTrue();
+
+        logger.info("🐘 PostgreSQL is running: {}", getPostgresJdbcUrl());
+
         // Arrange
         String content = """
                 This is an integration support document.
@@ -92,7 +110,8 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
         );
 
         // Act
-        ingestionService.ingestDocument(file, "integration-support");
+        assertThatCode(() -> ingestionService.ingestDocument(file, "integration-support"))
+                .doesNotThrowAnyException();
 
         // Assert
         List<DocumentEntity> documents = documentRepository.findAll();
@@ -104,8 +123,8 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
         assertThat(savedDoc.getMetadata()).isEqualTo("integration-support");
         assertThat(savedDoc.getCreatedAt()).isNotNull();
 
-        System.out.println("✅ Интеграционный тест успешно завершен");
-        System.out.println("📄 Документ сохранен с ID: " + savedDoc.getId());
+        logger.info("✅ Интеграционный тест успешно завершен");
+        logger.info("📄 Документ сохранен с ID: {}", savedDoc.getId());
     }
 
     /**
@@ -119,6 +138,9 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
     @Severity(SeverityLevel.NORMAL)
     @TmsLink("RAG-007")
     void testIngestMultipleDocuments() throws Exception {
+        // Проверяем что PostgreSQL запущен
+        assertThat(isPostgresRunning()).isTrue();
+
         // Arrange
         String[] contents = {
                 "First document for testing.",
@@ -141,7 +163,7 @@ class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithCon
         List<DocumentEntity> documents = documentRepository.findAll();
         assertThat(documents).hasSize(3);
 
-        System.out.println("✅ Тест множественной загрузки пройден");
-        System.out.println("📄 Загружено документов: " + documents.size());
+        logger.info("✅ Тест множественной загрузки пройден");
+        logger.info("📄 Загружено документов: {}", documents.size());
     }
 }

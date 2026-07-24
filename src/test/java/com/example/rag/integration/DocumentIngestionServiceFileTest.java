@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
@@ -45,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Epic("Интеграционные тесты")
 @Feature("Загрузка документов из файлов")
-class DocumentIngestionServiceFileTest extends BaseFileTest {  // ← ДОБАВИТЬ public
+class DocumentIngestionServiceFileTest extends BaseFileTest {
 
     /**
      * Временная директория для тестовых файлов.
@@ -55,6 +56,15 @@ class DocumentIngestionServiceFileTest extends BaseFileTest {  // ← ДОБАВ
      */
     @TempDir
     Path tempDir;
+
+    /**
+     * Очищает репозиторий перед каждым тестом.
+     */
+    @BeforeEach
+    void setUp() {
+        documentRepository.deleteAll();
+        logger.info("🧹 Repository cleared for test");
+    }
 
     /**
      * Проверяет загрузку документа из реального файла.
