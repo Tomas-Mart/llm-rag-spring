@@ -73,18 +73,22 @@ class ApplicationYamlTest extends BaseTest {
         String password = environment.getProperty("spring.datasource.password");
         String driver = environment.getProperty("spring.datasource.driver-class-name");
 
+        // Проверяем, что используется Testcontainers (PostgreSQL)
         assertThat(url)
-                .as("Database URL should use H2")
-                .startsWith("jdbc:h2:");
+                .as("Database URL should use Testcontainers PostgreSQL")
+                .startsWith("jdbc:tc:postgresql:16:///testdb");
+
         assertThat(username)
-                .as("Database username should be sa")
-                .isEqualTo("sa");
+                .as("Database username should be test")
+                .isEqualTo("test");
+
         assertThat(password)
-                .as("Database password should be empty")
-                .isEmpty();
+                .as("Database password should be test")
+                .isEqualTo("test");
+
         assertThat(driver)
-                .as("Database driver should be H2")
-                .isEqualTo("org.h2.Driver");
+                .as("Database driver should be Testcontainers JDBC")
+                .isEqualTo("org.testcontainers.jdbc.ContainerDatabaseDriver");
 
         logger.info("Datasource URL: {}", url);
         logger.info("Datasource Username: {}", username);
@@ -104,12 +108,15 @@ class ApplicationYamlTest extends BaseTest {
         String ddlAuto = environment.getProperty("spring.jpa.hibernate.ddl-auto");
         String showSql = environment.getProperty("spring.jpa.show-sql");
 
+        // Для интеграционных тестов с Testcontainers
         assertThat(ddlAuto)
                 .as("DDL auto should be create-drop for tests")
                 .isEqualTo("create-drop");
+
+        // В интеграционных тестах show-sql обычно false для производительности
         assertThat(showSql)
-                .as("Show SQL should be true for tests")
-                .isEqualTo("true");
+                .as("Show SQL should be false for integration tests")
+                .isEqualTo("false");
 
         logger.info("JPA DDL auto: {}", ddlAuto);
         logger.info("JPA Show SQL: {}", showSql);
@@ -247,13 +254,13 @@ class ApplicationYamlTest extends BaseTest {
 
         String url = environment.getProperty("spring.datasource.url");
 
+        // Проверяем формат URL для Testcontainers PostgreSQL
         assertThat(url)
-                .as("Database URL should be in correct format")
-                .startsWith("jdbc:h2:")
-                .contains("mem")
-                .contains("MODE=PostgreSQL");
+                .as("Database URL should be in correct format for Testcontainers")
+                .startsWith("jdbc:tc:postgresql:16:///testdb")
+                .contains("TC_IMAGE_TAG=16-alpine");
 
-        logger.info("Database URL format is correct");
+        logger.info("Database URL format is correct: {}", url);
     }
 
     /**
