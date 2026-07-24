@@ -128,6 +128,39 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
         </profile>
+
+        <!-- ========================================= -->
+        <!-- CI/CD ПРОФИЛЬ - ИСКЛЮЧАЕТ ИНТЕГРАЦИОННЫЕ ТЕСТЫ -->
+        <!-- ========================================= -->
+        <profile>
+            <id>ci</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <testFailureIgnore>false</testFailureIgnore>
+                            <!-- Исключаем все интеграционные и performance тесты в CI -->
+                            <excludes>
+                                <exclude>**/integration/**/*IntegrationTest.java</exclude>
+                                <exclude>**/*IntegrationTest.java</exclude>
+                                <exclude>**/*PerformanceTest.java</exclude>
+                                <exclude>**/integration/**/*PerformanceTest.java</exclude>
+                            </excludes>
+                            <!-- Запускаем только unit тесты -->
+                            <includes>
+                                <include>**/*Test.java</include>
+                                <include>**/config/*Test.java</include>
+                                <include>**/controller/*Test.java</include>
+                                <include>**/service/*Test.java</include>
+                                <include>**/entity/*Test.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <dependencyManagement>
