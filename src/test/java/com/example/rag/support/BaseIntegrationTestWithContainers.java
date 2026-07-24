@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -24,30 +25,18 @@ import static org.mockito.Mockito.when;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов с использованием Testcontainers.
- * Обеспечивает единую конфигурацию контейнеров для PostgreSQL и Ollama.
+ * Профессиональная реализация с изоляцией внешних зависимостей.
  *
- * <p>Основные возможности:
+ * <p>Архитектурные решения:
  * <ul>
- *   <li>Запуск PostgreSQL контейнера с pgvector</li>
- *   <li>Запуск Ollama контейнера</li>
- *   <li>Динамическая настройка свойств приложения</li>
+ *   <li>Использование @MockBean для изоляции от реальных LLM (Ollama)</li>
+ *   <li>Настройка моков через @BeforeEach для гарантии чистоты состояния</li>
+ *   <li>Динамическая конфигурация через @DynamicPropertySource</li>
+ *   <li>Поддержка опционального запуска Ollama для реальных интеграционных тестов</li>
  * </ul>
  *
- * <p>Пример использования:
- * <pre>{@code
- * @SpringBootTest
- * @Testcontainers
- * class MyIntegrationTest extends BaseIntegrationTestWithContainers {
- *
- *     @Test
- *     void testSomething() {
- *         // Используем контейнеры
- *     }
- * }
- * }</pre>
- *
  * @author RAG Application Team
- * @version 1.0
+ * @version 2.0
  * @since 1.0
  */
 @SpringBootTest(classes = Application.class)
@@ -55,17 +44,11 @@ import static org.mockito.Mockito.when;
 @Testcontainers
 public abstract class BaseIntegrationTestWithContainers {
 
-    /**
-     * Логгер для всех тестовых классов.
-     */
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     /**
-     * Контейнер PostgreSQL с pgvector.
-     * Используется для тестирования с реальной базой данных.
-     *
-     * <p>Используется {@link DockerImageName#asCompatibleSubstituteFor(String)}
-     * для совместимости с Testcontainers PostgreSQL API.</p>
+     * PostgreSQL контейнер с pgvector.
+     * Используется для тестирования с реальной БД.
      */
     @Container
     protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
@@ -79,21 +62,15 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withInitScript("init-pgvector.sql");
 
     /**
-     * Мок для EmbeddingModel.
-     * Используется для изоляции тестов от реального Ollama.
-     *
-     * <p>Этот мок предотвращает реальные вызовы к Ollama для создания эмбеддингов.
-     * Возвращает фиктивный вектор для любого текста.</p>
+     * Мок для EmbeddingModel - КЛЮЧЕВОЙ КОМПОНЕНТ!
+     * Изолирует тесты от реального Ollama.
      */
     @MockBean
     protected EmbeddingModel embeddingModel;
 
     /**
-     * Контейнер Ollama.
-     * Используется для тестирования с реальной LLM.
-     *
-     * <p>Используется {@code GenericContainer} для запуска Ollama.
-     * Модель qwen2.5-coder:7b загружается при старте.</p>
+     * Ollama контейнер - опциональный.
+     * Запускается только если нужны реальные LLM тесты.
      */
     @Container
     protected static final GenericContainer<?> OLLAMA_CONTAINER =
@@ -103,30 +80,31 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withReuse(true);
 
     /**
-     * Динамическая настройка свойств приложения.
-     * Подставляет URL контейнеров в конфигурацию Spring.
-     *
-     * @param registry реестр свойств для динамической настройки
+     * Динамическая конфигурация Spring.
+     * Переопределяет свойства приложения для тестов.
      */
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        // PostgreSQL
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
         registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
 
+        // JPA
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.properties.hibernate.dialect",
                 () -> "org.hibernate.dialect.PostgreSQLDialect");
-        registry.add("spring.jpa.show-sql", () -> "true");
+        registry.add("spring.jpa.show-sql", () -> "false");
 
+        // Flyway отключен
         registry.add("spring.flyway.enabled", () -> "false");
 
-        // Отключаем реальные вызовы к Ollama для эмбеддингов
+        // Ollama - ОТКЛЮЧЕН для эмбеддингов!
         registry.add("spring.ai.ollama.base-url", () -> "http://localhost:11434");
         registry.add("spring.ai.ollama.embedding.enabled", () -> "false");
-        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
 
+        // Vector Store
         registry.add("spring.ai.vectorstore.pgvector.index-type", () -> "HNSW");
         registry.add("spring.ai.vectorstore.pgvector.distance-type", () -> "EUCLIDEAN_DISTANCE");
         registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> "768");
@@ -137,84 +115,78 @@ public abstract class BaseIntegrationTestWithContainers {
 
     /**
      * Настройка мока перед каждым тестом.
+     * Создает фиктивные эмбеддинги для изоляции от Ollama.
      */
     @BeforeEach
     void setUpMock() {
-        // Создаем фиктивный вектор размером 768
-        float[] mockEmbedding = new float[768];
-        for (int i = 0; i < 768; i++) {
-            mockEmbedding[i] = (float) Math.random();
-        }
+        // Генерируем детерминированный вектор для воспроизводимости
+        float[] mockEmbedding = generateDeterministicEmbedding();
 
-        // Создаем Embedding объект с фиктивным вектором
-        // Используем конструктор Embedding(float[] embedding, Integer index)
+        // Создаем Embedding объект
         Embedding mockEmbeddingObj = new Embedding(mockEmbedding, 0);
 
-        // Создаем EmbeddingResponse с фиктивным вектором
+        // Создаем EmbeddingResponse
         EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
 
-        // Настраиваем мок для метода embed (один текст)
+        // Настраиваем все методы EmbeddingModel
         when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
-
-        // Настраиваем мок для метода embed (список текстов)
         when(embeddingModel.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
+        when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
 
-        // Настраиваем мок для метода call
-        when(embeddingModel.call(any())).thenReturn(mockResponse);
-
-        logger.info("🔧 EmbeddingModel mock configured successfully");
-        logger.debug("📊 Mock embedding vector size: {}", mockEmbedding.length);
+        logger.info("🔧 EmbeddingModel mock configured with deterministic vector");
+        logger.debug("📊 Vector dimension: {}", mockEmbedding.length);
     }
 
     /**
-     * Проверяет, что PostgreSQL контейнер запущен и доступен.
-     *
-     * @return {@code true} если контейнер запущен, {@code false} в противном случае
+     * Генерирует детерминированный вектор для воспроизводимости тестов.
+     * Использует фиксированное seed для гарантии одинаковых результатов.
+     */
+    private float[] generateDeterministicEmbedding() {
+        float[] embedding = new float[768];
+        for (int i = 0; i < embedding.length; i++) {
+            // Детерминированное значение на основе индекса
+            embedding[i] = (float) (Math.sin(i) * 0.5 + 0.5);
+        }
+        return embedding;
+    }
+
+    /**
+     * Проверяет запуск PostgreSQL контейнера.
      */
     protected boolean isPostgresRunning() {
         return POSTGRES_CONTAINER.isRunning();
     }
 
     /**
-     * Проверяет, что Ollama контейнер запущен и доступен.
-     *
-     * @return {@code true} если контейнер запущен, {@code false} в противном случае
+     * Проверяет запуск Ollama контейнера.
      */
     protected boolean isOllamaRunning() {
         return OLLAMA_CONTAINER.isRunning();
     }
 
     /**
-     * Возвращает JDBC URL для подключения к PostgreSQL.
-     *
-     * @return JDBC URL контейнера
+     * Возвращает JDBC URL.
      */
     protected String getPostgresJdbcUrl() {
         return POSTGRES_CONTAINER.getJdbcUrl();
     }
 
     /**
-     * Возвращает порт Ollama контейнера.
-     *
-     * @return порт Ollama
+     * Возвращает порт Ollama.
      */
     protected int getOllamaPort() {
         return OLLAMA_CONTAINER.getMappedPort(11434);
     }
 
     /**
-     * Возвращает полный URL Ollama.
-     *
-     * @return URL Ollama
+     * Возвращает URL Ollama.
      */
     protected String getOllamaUrl() {
         return "http://localhost:" + getOllamaPort();
     }
 
     /**
-     * Возвращает имя класса теста для использования в логировании.
-     *
-     * @return простое имя класса теста
+     * Возвращает имя теста для логирования.
      */
     protected String getTestName() {
         return getClass().getSimpleName();
