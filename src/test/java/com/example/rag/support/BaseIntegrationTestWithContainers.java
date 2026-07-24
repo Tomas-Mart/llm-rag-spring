@@ -1,8 +1,14 @@
 package com.example.rag.support;
 
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -12,6 +18,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import com.example.rag.Application;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов с использованием Testcontainers.
@@ -70,6 +79,16 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withInitScript("init-pgvector.sql");
 
     /**
+     * Мок для EmbeddingModel.
+     * Используется для изоляции тестов от реального Ollama.
+     *
+     * <p>Этот мок предотвращает реальные вызовы к Ollama для создания эмбеддингов.
+     * Возвращает фиктивный вектор для любого текста.</p>
+     */
+    @MockBean
+    protected EmbeddingModel embeddingModel;
+
+    /**
      * Контейнер Ollama.
      * Используется для тестирования с реальной LLM.
      *
@@ -103,14 +122,48 @@ public abstract class BaseIntegrationTestWithContainers {
 
         registry.add("spring.flyway.enabled", () -> "false");
 
-        registry.add("spring.ai.ollama.base-url", () ->
-                "http://localhost:" + OLLAMA_CONTAINER.getMappedPort(11434));
+        // Отключаем реальные вызовы к Ollama для эмбеддингов
+        registry.add("spring.ai.ollama.base-url", () -> "http://localhost:11434");
+        registry.add("spring.ai.ollama.embedding.enabled", () -> "false");
+        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
 
         registry.add("spring.ai.vectorstore.pgvector.index-type", () -> "HNSW");
         registry.add("spring.ai.vectorstore.pgvector.distance-type", () -> "EUCLIDEAN_DISTANCE");
         registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> "768");
         registry.add("spring.ai.vectorstore.pgvector.table-name", () -> "vector_store");
         registry.add("spring.ai.vectorstore.pgvector.drop-table", () -> "true");
+        registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
+    }
+
+    /**
+     * Настройка мока перед каждым тестом.
+     */
+    @BeforeEach
+    void setUpMock() {
+        // Создаем фиктивный вектор размером 768
+        float[] mockEmbedding = new float[768];
+        for (int i = 0; i < 768; i++) {
+            mockEmbedding[i] = (float) Math.random();
+        }
+
+        // Создаем Embedding объект с фиктивным вектором
+        // Используем конструктор Embedding(float[] embedding, Integer index)
+        Embedding mockEmbeddingObj = new Embedding(mockEmbedding, 0);
+
+        // Создаем EmbeddingResponse с фиктивным вектором
+        EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
+
+        // Настраиваем мок для метода embed (один текст)
+        when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
+
+        // Настраиваем мок для метода embed (список текстов)
+        when(embeddingModel.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
+
+        // Настраиваем мок для метода call
+        when(embeddingModel.call(any())).thenReturn(mockResponse);
+
+        logger.info("🔧 EmbeddingModel mock configured successfully");
+        logger.debug("📊 Mock embedding vector size: {}", mockEmbedding.length);
     }
 
     /**
