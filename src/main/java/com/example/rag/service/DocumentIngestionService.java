@@ -296,7 +296,7 @@ public class DocumentIngestionService {
      */
     private Document createDocument(String content, String fileName, String metadata) {
         return Document.builder()
-                .text(content)                           // ← ИСПРАВЛЕНО: withContent → text
+                .text(content)
                 .metadata("fileName", fileName)
                 .metadata("metadata", metadata != null ? metadata : "")
                 .metadata("uploadedAt", LocalDateTime.now().toString())

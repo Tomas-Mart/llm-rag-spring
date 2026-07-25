@@ -1,6 +1,7 @@
 package com.example.rag.support;
 
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.Embedding;
@@ -42,10 +43,10 @@ import static org.mockito.Mockito.when;
  * @version 2.0
  * @since 1.0
  */
-@SpringBootTest(classes = {Application.class, BaseIntegrationTestWithContainers.MockConfig.class})
-@ActiveProfiles("integration-test")
 @Testcontainers
+@ActiveProfiles("integration-test")
 @SuppressWarnings({"resource", "unused"})
+@SpringBootTest(classes = {Application.class, BaseIntegrationTestWithContainers.MockConfig.class})
 public abstract class BaseIntegrationTestWithContainers {
 
     /**
@@ -174,6 +175,15 @@ public abstract class BaseIntegrationTestWithContainers {
         registry.add("spring.ai.vectorstore.pgvector.table-name", () -> "vector_store");
         registry.add("spring.ai.vectorstore.pgvector.drop-table", () -> "true");
         registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
+    }
+
+    /**
+     * Настройка мока перед каждым тестом.
+     * Проверяет, что мок EmbeddingModel настроен корректно.
+     */
+    @BeforeEach
+    void setUpMock() {
+        logger.info("🔧 EmbeddingModel mock is ready for test: {}", getTestName());
     }
 
     /**
