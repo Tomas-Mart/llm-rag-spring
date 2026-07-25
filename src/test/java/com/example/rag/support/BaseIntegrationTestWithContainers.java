@@ -59,7 +59,8 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withDatabaseName("rag_db")
                     .withUsername("rag_user")
                     .withPassword("rag_pass")
-                    .withInitScript("init-pgvector.sql");
+                    .withInitScript("init-pgvector.sql")
+                    .withReuse(true);
 
     /**
      * Мок для EmbeddingModel - КЛЮЧЕВОЙ КОМПОНЕНТ!
@@ -90,12 +91,15 @@ public abstract class BaseIntegrationTestWithContainers {
         registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
         registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "2");
+        registry.add("spring.datasource.hikari.connection-timeout", () -> "30000");
 
         // JPA
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.properties.hibernate.dialect",
                 () -> "org.hibernate.dialect.PostgreSQLDialect");
         registry.add("spring.jpa.show-sql", () -> "false");
+        registry.add("spring.jpa.properties.hibernate.format_sql", () -> "true");
 
         // Flyway отключен
         registry.add("spring.flyway.enabled", () -> "false");
