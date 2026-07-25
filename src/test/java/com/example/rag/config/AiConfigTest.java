@@ -6,8 +6,6 @@ import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import com.example.rag.support.BaseTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,8 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @version 1.1.8
  * @since 1.0
  */
-@SpringBootTest
-@ActiveProfiles("test")
 class AiConfigTest extends BaseTest {
 
     /**
@@ -59,13 +55,10 @@ class AiConfigTest extends BaseTest {
     @Test
     void testOllamaApiBean() {
         assertMocksCreated();
-        // В тестовом профиле OllamaApi может быть null (если не создается)
-        if (ollamaApi != null) {
-            logger.info("OllamaApi created: {}", ollamaApi);
-        } else {
-            logger.warn("OllamaApi is not available in test context (expected)");
-        }
-        // Не проверяем на null, так как в тестовом профиле он может отсутствовать
+        assertThat(ollamaApi)
+                .as("OllamaApi should be created")
+                .isNotNull();
+        logger.info("OllamaApi created: {}", ollamaApi);
     }
 
     /**
@@ -74,12 +67,10 @@ class AiConfigTest extends BaseTest {
     @Test
     void testChatModelBean() {
         assertMocksCreated();
-        // В тестовом профиле OllamaChatModel может быть null (если не создается)
-        if (ollamaChatModel != null) {
-            logger.info("OllamaChatModel created: {}", ollamaChatModel);
-        } else {
-            logger.warn("OllamaChatModel is not available in test context (expected)");
-        }
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel should be created")
+                .isNotNull();
+        logger.info("OllamaChatModel created: {}", ollamaChatModel);
     }
 
     /**
@@ -98,7 +89,7 @@ class AiConfigTest extends BaseTest {
                     .as("ChatClient should be created")
                     .isNotNull();
         } else {
-            logger.warn("ChatClient is not available in test context (expected)");
+            logger.warn("ChatClient is not available in test context");
         }
     }
 
@@ -108,11 +99,10 @@ class AiConfigTest extends BaseTest {
     @Test
     void testOllamaApiUrl() {
         assertMocksCreated();
-        if (ollamaApi != null) {
-            logger.info("OllamaApi created successfully");
-        } else {
-            logger.warn("OllamaApi is not available in test context (expected)");
-        }
+        assertThat(ollamaApi)
+                .as("OllamaApi should be created")
+                .isNotNull();
+        logger.info("OllamaApi created successfully");
     }
 
     /**
@@ -139,7 +129,7 @@ class AiConfigTest extends BaseTest {
         assertMocksCreated();
 
         if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context (expected)");
+            logger.warn("OllamaOptions is not available in test context");
             return;
         }
 
