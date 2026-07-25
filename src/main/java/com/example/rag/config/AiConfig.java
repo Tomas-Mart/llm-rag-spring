@@ -105,16 +105,4 @@ public class AiConfig {
             throw new RuntimeException("Test DataSource initialization failed", e);
         }
     }
-
-    // === DATA SOURCE ДЛЯ INTEGRATION-TEST ПРОФИЛЯ ===
-
-    @Bean
-    @Primary
-    @Profile("integration-test")
-    public DataSource integrationTestDataSource() {
-        // DataSource будет взят из application-integration-test.yml
-        // Этот бин нужен только для явного указания @Primary в этом профиле
-        log.info("🔧 Используем DataSource из application-integration-test.yml");
-        return null;  // ← Spring возьмет из application-integration-test.yml
-    }
 }
