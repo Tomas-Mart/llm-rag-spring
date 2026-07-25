@@ -76,7 +76,7 @@ public abstract class BaseIntegrationTestWithContainers {
     protected static final GenericContainer<?> OLLAMA_CONTAINER =
             new GenericContainer<>(DockerImageName.parse("ollama/ollama:latest"))
                     .withExposedPorts(11434)
-                    .withCommand("ollama pull qwen2.5-coder:7b")
+                    .withCommand("serve")
                     .withReuse(true);
 
     /**
