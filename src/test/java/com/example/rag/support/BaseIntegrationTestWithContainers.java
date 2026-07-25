@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
  */
 @Testcontainers
 @ActiveProfiles("integration-test")
-@SuppressWarnings({"resource", "unused"})
+@SuppressWarnings({"resource", "unused", "rawtypes"})
 @SpringBootTest(classes = {Application.class, BaseIntegrationTestWithContainers.MockConfig.class})
 public abstract class BaseIntegrationTestWithContainers {
 
@@ -79,6 +79,7 @@ public abstract class BaseIntegrationTestWithContainers {
          */
         @Bean
         @Primary
+        @SuppressWarnings({"unchecked"})
         public EmbeddingModel embeddingModel() {
             EmbeddingModel mock = mock(EmbeddingModel.class);
 
@@ -90,8 +91,15 @@ public abstract class BaseIntegrationTestWithContainers {
             EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
 
             // Настраиваем все методы
+            // 1. embed(String) - возвращает float[]
             when(mock.embed(any(String.class))).thenReturn(mockEmbedding);
-            when(mock.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
+
+            // 2. embed(List<String>) - возвращает List<float[]>
+            // Используем @SuppressWarnings для подавления unchecked предупреждения
+            List<String> anyStringList = any(List.class);
+            when(mock.embed(anyStringList)).thenReturn(List.of(mockEmbedding));
+
+            // 3. call(EmbeddingRequest) - возвращает EmbeddingResponse
             when(mock.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
 
             return mock;
@@ -192,7 +200,13 @@ public abstract class BaseIntegrationTestWithContainers {
      * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isPostgresRunning() {
-        return POSTGRES_CONTAINER.isRunning();
+        boolean isRunning = POSTGRES_CONTAINER.isRunning();
+        if (isRunning) {
+            logger.debug("🐘 PostgreSQL is running: {}", getPostgresJdbcUrl());
+        } else {
+            logger.warn("⚠️ PostgreSQL is not running");
+        }
+        return isRunning;
     }
 
     /**
@@ -201,7 +215,13 @@ public abstract class BaseIntegrationTestWithContainers {
      * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isOllamaRunning() {
-        return OLLAMA_CONTAINER.isRunning();
+        boolean isRunning = OLLAMA_CONTAINER.isRunning();
+        if (isRunning) {
+            logger.debug("🤖 Ollama is running on port: {}", getOllamaPort());
+        } else {
+            logger.warn("⚠️ Ollama is not running");
+        }
+        return isRunning;
     }
 
     /**
