@@ -4,33 +4,49 @@ spring:
 
   datasource:
     driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/rag_integration_test
+    username: test_user
+    password: test_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
-          batch_size: 20
+          batch_size: 50
         order_inserts: true
+        order_updates: true
+        generate_statistics: true
 
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    clean-disabled: false
+    clean-on-validation-error: true
 
   ai:
     ollama:
-      base-url: http://localhost:11434
+      base-url: ${OLLAMA_URL:http://localhost:11434}
       chat:
         options:
-          model: qwen2.5-coder:7b
+          model: ${OLLAMA_MODEL:qwen2.5-coder:7b}
           temperature: 0.2
           num-ctx: 4096
       embedding:
         options:
-          model: nomic-embed-text:v1.5
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text:v1.5}
 
     vectorstore:
       pgvector:
@@ -38,13 +54,17 @@ spring:
         distance-type: EUCLIDEAN_DISTANCE
         dimensions: 768
         table-name: vector_store
-        drop-table: true
+        drop-table: false  # Не дропаем таблицу в интеграционных тестах
         initialize-schema: true
+        schema-name: public
 
 logging:
   level:
-    org.springframework.ai: DEBUG
-    org.springframework.jdbc: DEBUG
+    org.springframework.ai: INFO
+    org.springframework.jdbc: INFO
+    org.springframework.transaction: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.stat: DEBUG
     com.example.rag: DEBUG
+    org.flywaydb: INFO
