@@ -22,9 +22,10 @@ public class AiConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AiConfig.class);
 
-    // === БАЗОВЫЕ БИНЫ (общие для всех профилей) ===
+    // === БАЗОВЫЕ БИНЫ (НЕ создаем в тестовом профиле) ===
 
     @Bean
+    @Profile("!test")
     public OllamaApi ollamaApi() {
         try {
             log.info("🔧 Инициализация Ollama API на http://localhost:11434");
@@ -38,6 +39,7 @@ public class AiConfig {
     }
 
     @Bean
+    @Profile("!test")
     public OllamaChatModel chatModel(OllamaApi ollamaApi) {
         try {
             log.info("🔧 Инициализация OllamaChatModel с моделью qwen2.5-coder:7b");
@@ -55,6 +57,7 @@ public class AiConfig {
     }
 
     @Bean
+    @Profile("!test")
     public ChatClient chatClient(OllamaChatModel chatModel) {
         try {
             log.info("🔧 Инициализация ChatClient");
@@ -65,9 +68,10 @@ public class AiConfig {
         }
     }
 
-    // === ✅ PgVectorStore (постоянное хранилище) ===
+    // === ✅ PgVectorStore (постоянное хранилище, НЕ создаем в тестовом профиле) ===
 
     @Bean
+    @Profile("!test")
     public VectorStore vectorStore(JdbcTemplate jdbcTemplate, EmbeddingModel embeddingModel) {
         try {
             log.info("🔧 Инициализация PgVectorStore с таблицей vector_store");
@@ -92,7 +96,7 @@ public class AiConfig {
             log.info("🔧 Инициализация тестового DataSource (H2)");
             DriverManagerDataSource dataSource = new DriverManagerDataSource();
             dataSource.setDriverClassName("org.h2.Driver");
-            dataSource.setUrl("jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+            dataSource.setUrl("jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
             dataSource.setUsername("sa");
             dataSource.setPassword("");
             return dataSource;
