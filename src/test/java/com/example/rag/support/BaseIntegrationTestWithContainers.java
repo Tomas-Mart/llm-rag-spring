@@ -100,9 +100,12 @@ public abstract class BaseIntegrationTestWithContainers {
         // Flyway отключен
         registry.add("spring.flyway.enabled", () -> "false");
 
-        // Ollama - ОТКЛЮЧЕН для эмбеддингов!
+        // ============================================================
+        // КЛЮЧЕВОЕ: ОТКЛЮЧАЕМ РЕАЛЬНЫЕ ЭМБЕДДИНГИ
+        // ============================================================
         registry.add("spring.ai.ollama.base-url", () -> "http://localhost:11434");
         registry.add("spring.ai.ollama.embedding.enabled", () -> "false");
+        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
 
         // Vector Store
         registry.add("spring.ai.vectorstore.pgvector.index-type", () -> "HNSW");
@@ -129,18 +132,20 @@ public abstract class BaseIntegrationTestWithContainers {
         EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
 
         // ============================================================
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: правильные типы для embed(List<String>)
+        // НАСТРОЙКА ВСЕХ МЕТОДОВ EmbeddingModel
         // ============================================================
 
         // 1. Для метода embed(String text) - возвращает float[]
         when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
 
         // 2. Для метода embed(List<String> texts) - возвращает List<float[]>
-        //    ВАЖНО: каждый элемент списка - это float[] (вектор для каждого текста)
         when(embeddingModel.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
 
         // 3. Для метода call(EmbeddingRequest request) - возвращает EmbeddingResponse
         when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
+
+        // 4. Для метода getDefaultOptions() - возвращает не null
+        // когда(embeddingModel.getDefaultOptions()).thenReturn(null);
 
         logger.info("🔧 EmbeddingModel mock configured with deterministic vector");
         logger.debug("📊 Vector dimension: {}", mockEmbedding.length);

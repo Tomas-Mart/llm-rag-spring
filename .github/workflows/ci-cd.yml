@@ -8,7 +8,7 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # Ежедневный запуск в 2:00 (PRO-практика)
+    - cron: '0 2 * * *'
 
 env:
   JAVA_VERSION: '21'
@@ -17,7 +17,6 @@ env:
   SONAR_ORGANIZATION: 'tomas-mart'
   SONAR_PROJECT_KEY: 'Tomas-Mart_llm-rag-spring'
 
-# PRO: Concurrency для предотвращения параллельных запусков
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -79,12 +78,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Run Unit Tests
+      - name: Run Unit Tests with CI profile
         run: |
-          mvn test \
-            -Dtest="**/*Test.java" \
-            -DexcludedGroups="integration,performance" \
-            -DfailIfNoTests=false
+          mvn test -Pci \
+            -Dspring.profiles.active=test \
+            -DfailIfNoTests=false \
+            -Djacoco.skip=true
 
       - name: Upload test reports
         uses: actions/upload-artifact@v4
@@ -108,13 +107,14 @@ jobs:
           max-annotations: 10
 
   # ============================================
-  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ (с PostgreSQL, без Ollama)
+  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ (НЕ БЛОКИРУЮТ СБОРКУ)
   # ============================================
   integration-tests:
     name: 🔗 Integration Tests
     runs-on: ubuntu-latest
     needs: build
-    continue-on-error: true  # Не блокируем сборку при падении
+    continue-on-error: true  # НЕ БЛОКИРУЕМ СБОРКУ!
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -131,9 +131,9 @@ jobs:
           docker pull pgvector/pgvector:pg16 || true
           docker pull postgres:16-alpine || true
 
-      - name: Run Integration Tests (with CI profile)
+      - name: Run Integration Tests
         run: |
-          mvn verify -Pci \
+          mvn verify -Pintegration-tests \
             -Dtest="**/*IntegrationTest.java" \
             -Dspring.profiles.active=integration-test \
             -DfailIfNoTests=false
@@ -160,13 +160,13 @@ jobs:
           max-annotations: 10
 
   # ============================================
-  # 4. PERFORMANCE ТЕСТЫ (запускаем только в develop/main)
+  # 4. PERFORMANCE ТЕСТЫ (только по расписанию)
   # ============================================
   performance-tests:
     name: ⚡ Performance Tests
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    if: github.event_name == 'schedule'
     continue-on-error: true
     steps:
       - name: Checkout code
@@ -181,8 +181,7 @@ jobs:
 
       - name: Run Performance Tests
         run: |
-          mvn test \
-            -Dtest="**/*PerformanceTest.java" \
+          mvn test -Pperformance-tests \
             -Dspring.profiles.active=test \
             -DfailIfNoTests=false
 

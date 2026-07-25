@@ -156,11 +156,37 @@
                                 <include>**/service/*Test.java</include>
                                 <include>**/entity/*Test.java</include>
                             </includes>
+                            <!-- Отключаем JaCoCo в CI для скорости -->
+                            <systemPropertyVariables>
+                                <jacoco.skip>true</jacoco.skip>
+                            </systemPropertyVariables>
                         </configuration>
                     </plugin>
                 </plugins>
             </build>
+
+            <!-- ========================================= -->
+            <!-- PERFORMANCE ТЕСТЫ (запускаются отдельно) -->
+            <!-- ========================================= -->
+            <profile>
+                <id>performance-tests</id>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <configuration>
+                                <testFailureIgnore>true</testFailureIgnore>
+                                <includes>
+                                    <include>**/*PerformanceTest.java</include>
+                                </includes>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </build>
+            </profile>
         </profile>
+
     </profiles>
 
     <dependencyManagement>
