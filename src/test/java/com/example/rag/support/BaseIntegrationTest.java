@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * <ul>
  *   <li>{@code STATIC_LOGGER} - для статических контекстов (static block, @DynamicPropertySource)</li>
  *   <li>{@code log} (Lombok) - для нестатических методов экземпляров</li>
+ *   <li>{@code logger} - защищенный логгер для наследников</li>
  * </ul>
  *
  * @author RAG Application Team
@@ -72,8 +73,16 @@ public abstract class BaseIntegrationTest {
      */
     private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
-    // Lombok @Slf4j предоставляет статическое поле 'log' для нестатических методов
+    /**
+     * Защищенный логгер для классов-наследников.
+     * Позволяет использовать логирование в подклассах.
+     */
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
 
+    // Lombok @Slf4j предоставляет статическое поле 'log' для нестатических методов
+    // Однако оно private, поэтому наследники должны использовать logger или методы логирования
+
+    // ... остальной код без изменений ...
     // ============================================================
     // TESTCONTAINERS
     // ============================================================
