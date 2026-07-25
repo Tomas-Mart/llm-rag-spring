@@ -60,7 +60,7 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # 2. UNIT ТЕСТЫ (только быстрые тесты)
+  # 2. UNIT ТЕСТЫ
   # ============================================
   unit-tests:
     name: 🧪 Unit Tests
@@ -106,7 +106,7 @@ jobs:
           max-annotations: 10
 
   # ============================================
-  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ (НЕ БЛОКИРУЮТ СБОРКУ)
+  # 3. ИНТЕГРАЦИОННЫЕ ТЕСТЫ
   # ============================================
   integration-tests:
     name: 🔗 Integration Tests
@@ -161,7 +161,7 @@ jobs:
           max-annotations: 10
 
   # ============================================
-  # 4. PERFORMANCE ТЕСТЫ (только по расписанию)
+  # 4. PERFORMANCE ТЕСТЫ
   # ============================================
   performance-tests:
     name: ⚡ Performance Tests
@@ -325,9 +325,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          # cache-to: type=gha,mode=max  # ← ЗАКОММЕНТИРОВАТЬ ИЛИ УДАЛИТЬ
+          # cache-to: type=gha,mode=max  # ← ЗАКОММЕНТИРОВАНО
 
       - name: Scan Docker image for vulnerabilities
+        if: steps.meta.outputs.version != ''  # ← ДОБАВЛЕНО УСЛОВИЕ
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:${{ steps.meta.outputs.version }}
@@ -336,8 +337,8 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security
+        if: always() && steps.meta.outputs.version != ''  # ← ДОБАВЛЕНО УСЛОВИЕ
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -384,7 +385,7 @@ jobs:
           echo "✅ Application is healthy!"
 
   # ============================================
-  # 8. DEPLOY TO PRODUCTION (только main)
+  # 8. DEPLOY TO PRODUCTION
   # ============================================
   deploy-prod:
     name: 🚀 Deploy to Production
@@ -426,7 +427,7 @@ jobs:
           echo "✅ Application is healthy!"
 
   # ============================================
-  # 9. NOTIFICATIONS (PRO-фича)
+  # 9. NOTIFICATIONS
   # ============================================
   notify:
     name: 📨 Notifications

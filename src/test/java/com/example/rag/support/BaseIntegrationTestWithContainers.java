@@ -42,6 +42,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(classes = Application.class)
 @ActiveProfiles("integration-test")
 @Testcontainers
+@SuppressWarnings({"resource", "unused"})
 public abstract class BaseIntegrationTestWithContainers {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
@@ -49,6 +50,10 @@ public abstract class BaseIntegrationTestWithContainers {
     /**
      * PostgreSQL контейнер с pgvector.
      * Используется для тестирования с реальной БД.
+     *
+     * <p>Аннотация {@code @Container} управляет жизненным циклом контейнера.
+     * Предупреждение IDE о try-with-resources игнорируется, так как
+     * Testcontainers управляет ресурсами автоматически.</p>
      */
     @Container
     protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
@@ -65,6 +70,9 @@ public abstract class BaseIntegrationTestWithContainers {
     /**
      * Мок для EmbeddingModel - КЛЮЧЕВОЙ КОМПОНЕНТ!
      * Изолирует тесты от реального Ollama.
+     *
+     * <p>Используется {@code @MockBean} для создания мока вместо реального бина.
+     * В тестовом контексте этот мок автоматически переопределяет реальный бин.</p>
      */
     @MockBean
     protected EmbeddingModel embeddingModel;
@@ -72,6 +80,10 @@ public abstract class BaseIntegrationTestWithContainers {
     /**
      * Ollama контейнер - опциональный.
      * Запускается только если нужны реальные LLM тесты.
+     *
+     * <p>Аннотация {@code @Container} управляет жизненным циклом контейнера.
+     * Предупреждение IDE о try-with-resources игнорируется, так как
+     * Testcontainers управляет ресурсами автоматически.</p>
      */
     @Container
     protected static final GenericContainer<?> OLLAMA_CONTAINER =
@@ -93,6 +105,7 @@ public abstract class BaseIntegrationTestWithContainers {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "2");
         registry.add("spring.datasource.hikari.connection-timeout", () -> "30000");
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "600000");
 
         // JPA
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
@@ -143,7 +156,9 @@ public abstract class BaseIntegrationTestWithContainers {
         when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
 
         // 2. Для метода embed(List<String> texts) - возвращает List<float[]>
-        when(embeddingModel.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
+        @SuppressWarnings("unchecked")
+        List<String> anyStringList = any(List.class);
+        when(embeddingModel.embed(anyStringList)).thenReturn(List.of(mockEmbedding));
 
         // 3. Для метода call(EmbeddingRequest request) - возвращает EmbeddingResponse
         when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
@@ -168,6 +183,8 @@ public abstract class BaseIntegrationTestWithContainers {
 
     /**
      * Проверяет запуск PostgreSQL контейнера.
+     *
+     * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isPostgresRunning() {
         return POSTGRES_CONTAINER.isRunning();
@@ -175,6 +192,8 @@ public abstract class BaseIntegrationTestWithContainers {
 
     /**
      * Проверяет запуск Ollama контейнера.
+     *
+     * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isOllamaRunning() {
         return OLLAMA_CONTAINER.isRunning();
@@ -182,6 +201,8 @@ public abstract class BaseIntegrationTestWithContainers {
 
     /**
      * Возвращает JDBC URL.
+     *
+     * @return JDBC URL контейнера
      */
     protected String getPostgresJdbcUrl() {
         return POSTGRES_CONTAINER.getJdbcUrl();
@@ -189,20 +210,17 @@ public abstract class BaseIntegrationTestWithContainers {
 
     /**
      * Возвращает порт Ollama.
+     *
+     * @return порт Ollama
      */
     protected int getOllamaPort() {
         return OLLAMA_CONTAINER.getMappedPort(11434);
     }
 
     /**
-     * Возвращает URL Ollama.
-     */
-    protected String getOllamaUrl() {
-        return "http://localhost:" + getOllamaPort();
-    }
-
-    /**
      * Возвращает имя теста для логирования.
+     *
+     * @return простое имя класса теста
      */
     protected String getTestName() {
         return getClass().getSimpleName();
