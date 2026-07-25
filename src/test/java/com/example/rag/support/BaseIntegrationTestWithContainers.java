@@ -129,20 +129,18 @@ public abstract class BaseIntegrationTestWithContainers {
         EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
 
         // ============================================================
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Настраиваем ВСЕ методы EmbeddingModel
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: правильные типы для embed(List<String>)
         // ============================================================
 
         // 1. Для метода embed(String text) - возвращает float[]
         when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
 
         // 2. Для метода embed(List<String> texts) - возвращает List<float[]>
+        //    ВАЖНО: каждый элемент списка - это float[] (вектор для каждого текста)
         when(embeddingModel.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
 
         // 3. Для метода call(EmbeddingRequest request) - возвращает EmbeddingResponse
         when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
-
-        // 4. ДОПОЛНИТЕЛЬНО: Для метода embed(Document) если используется
-        // когда(embeddingModel.embed(any(Document.class))).thenReturn(mockEmbedding);
 
         logger.info("🔧 EmbeddingModel mock configured with deterministic vector");
         logger.debug("📊 Vector dimension: {}", mockEmbedding.length);
