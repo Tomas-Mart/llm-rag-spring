@@ -1,5 +1,7 @@
 package com.example.rag.support;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -263,15 +265,13 @@ public final class TestUtils {
      * @return {@link CompletableFuture} для ожидания завершения всех задач
      */
     public static CompletableFuture<Void> runParallel(Iterable<Runnable> tasks) {
-        @SuppressWarnings("unchecked")
-        CompletableFuture<Void>[] futures = new CompletableFuture[0];
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        java.util.stream.StreamSupport.stream(tasks.spliterator(), false)
-                .map(task -> CompletableFuture.runAsync(task, VIRTUAL_THREAD_EXECUTOR))
-                .reduce(CompletableFuture.allOf(futures), (future1, future2) ->
-                        CompletableFuture.allOf(future1, future2));
+        for (Runnable task : tasks) {
+            futures.add(CompletableFuture.runAsync(task, VIRTUAL_THREAD_EXECUTOR));
+        }
 
-        return CompletableFuture.allOf(futures);
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
     }
 
     /**

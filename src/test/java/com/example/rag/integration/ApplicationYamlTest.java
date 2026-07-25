@@ -73,6 +73,8 @@ class ApplicationYamlTest extends BaseTest {
         String password = environment.getProperty("spring.datasource.password");
         String driver = environment.getProperty("spring.datasource.driver-class-name");
 
+        assertThat(password).isNotNull();
+
         // Проверяем, что URL не null
         assertThat(url)
                 .as("Database URL should be configured")
