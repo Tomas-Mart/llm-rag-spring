@@ -25,6 +25,7 @@ public class AiConfig {
     // === БАЗОВЫЕ БИНЫ (общие для всех профилей) ===
 
     @Bean
+    @Profile("!test")  // ← НЕ создаем в тестовом профиле
     public OllamaApi ollamaApi() {
         try {
             log.info("🔧 Инициализация Ollama API на http://localhost:11434");
@@ -38,6 +39,7 @@ public class AiConfig {
     }
 
     @Bean
+    @Profile("!test")  // ← НЕ создаем в тестовом профиле
     public OllamaChatModel chatModel(OllamaApi ollamaApi) {
         try {
             log.info("🔧 Инициализация OllamaChatModel с моделью qwen2.5-coder:7b");
@@ -55,6 +57,7 @@ public class AiConfig {
     }
 
     @Bean
+    @Profile("!test")  // ← НЕ создаем в тестовом профиле
     public ChatClient chatClient(OllamaChatModel chatModel) {
         try {
             log.info("🔧 Инициализация ChatClient");
@@ -68,6 +71,7 @@ public class AiConfig {
     // === ✅ PgVectorStore (постоянное хранилище) ===
 
     @Bean
+    @Profile("!test")  // ← НЕ создаем в тестовом профиле
     public VectorStore vectorStore(JdbcTemplate jdbcTemplate, EmbeddingModel embeddingModel) {
         try {
             log.info("🔧 Инициализация PgVectorStore с таблицей vector_store");
@@ -86,13 +90,13 @@ public class AiConfig {
 
     @Bean
     @Primary
-    @Profile("test")
+    @Profile("test")  // ← ТОЛЬКО для тестового профиля
     public DataSource testDataSource() {
         try {
             log.info("🔧 Инициализация тестового DataSource (H2)");
             DriverManagerDataSource dataSource = new DriverManagerDataSource();
             dataSource.setDriverClassName("org.h2.Driver");
-            dataSource.setUrl("jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+            dataSource.setUrl("jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
             dataSource.setUsername("sa");
             dataSource.setPassword("");
             return dataSource;
@@ -100,5 +104,17 @@ public class AiConfig {
             log.error("❌ Не удалось создать тестовый DataSource", e);
             throw new RuntimeException("Test DataSource initialization failed", e);
         }
+    }
+
+    // === DATA SOURCE ДЛЯ INTEGRATION-TEST ПРОФИЛЯ ===
+
+    @Bean
+    @Primary
+    @Profile("integration-test")
+    public DataSource integrationTestDataSource() {
+        // DataSource будет взят из application-integration-test.yml
+        // Этот бин нужен только для явного указания @Primary в этом профиле
+        log.info("🔧 Используем DataSource из application-integration-test.yml");
+        return null;  // ← Spring возьмет из application-integration-test.yml
     }
 }
