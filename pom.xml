@@ -76,13 +76,9 @@
     </repositories>
 
     <profiles>
-        <profile>
-            <id>test</id>
-            <properties>
-                <spring.profiles.active>test</spring.profiles.active>
-            </properties>
-        </profile>
-
+        <!-- ========================================= -->
+        <!-- SPRING ПРОФИЛИ                            -->
+        <!-- ========================================= -->
         <profile>
             <id>dev</id>
             <properties>
@@ -94,20 +90,22 @@
         </profile>
 
         <profile>
+            <id>test</id>
+            <properties>
+                <spring.profiles.active>test</spring.profiles.active>
+            </properties>
+        </profile>
+
+        <profile>
             <id>prod</id>
             <properties>
                 <spring.profiles.active>prod</spring.profiles.active>
             </properties>
         </profile>
 
-        <profile>
-            <id>integration-tests</id>
-            <properties>
-                <skipITs>false</skipITs>
-            </properties>
-        </profile>
-
-        <!-- Профиль для SonarCloud -->
+        <!-- ========================================= -->
+        <!-- SONAR ПРОФИЛИ                             -->
+        <!-- ========================================= -->
         <profile>
             <id>sonarcloud</id>
             <properties>
@@ -117,7 +115,6 @@
             </properties>
         </profile>
 
-        <!-- Профиль для локального SonarQube -->
         <profile>
             <id>sonar-local</id>
             <properties>
@@ -198,7 +195,7 @@
         </profile>
 
         <!-- ========================================= -->
-        <!-- PERFORMANCE ТЕСТЫ (запускаются отдельно) -->
+        <!-- PERFORMANCE ТЕСТЫ (запускаются отдельно)  -->
         <!-- ========================================= -->
         <profile>
             <id>performance-tests</id>
@@ -253,52 +250,6 @@
                 </plugins>
             </build>
         </profile>
-
-        <!-- Остальные профили (dev, prod, sonarcloud, etc.) -->
-        <profile>
-            <id>dev</id>
-            <properties>
-                <spring.profiles.active>dev</spring.profiles.active>
-            </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-        </profile>
-
-        <profile>
-            <id>prod</id>
-            <properties>
-                <spring.profiles.active>prod</spring.profiles.active>
-            </properties>
-        </profile>
-
-        <profile>
-            <id>test</id>
-            <properties>
-                <spring.profiles.active>test</spring.profiles.active>
-            </properties>
-        </profile>
-
-        <profile>
-            <id>sonarcloud</id>
-            <properties>
-                <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-                <sonar.organization>tomas-mart</sonar.organization>
-                <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
-            </properties>
-        </profile>
-
-        <profile>
-            <id>sonar-local</id>
-            <properties>
-                <sonar.host.url>http://localhost:9000</sonar.host.url>
-                <sonar.projectKey>llm-rag-spring-local</sonar.projectKey>
-            </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-        </profile>
-
     </profiles>
 
     <dependencyManagement>
