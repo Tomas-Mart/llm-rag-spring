@@ -55,11 +55,11 @@ class AiConfigTest extends BaseTest {
 
     /**
      * Проверяет, что низкоуровневый бин {@link OllamaApi} успешно инициализирован.
+     * В тестовом профиле может быть null (заменен на мок).
      */
     @Test
     void testOllamaApiBean() {
         assertMocksCreated();
-        // В тестовом профиле OllamaApi может быть null (не создается)
         if (ollamaApi != null) {
             logger.info("OllamaApi created: {}", ollamaApi);
         } else {
@@ -69,11 +69,11 @@ class AiConfigTest extends BaseTest {
 
     /**
      * Проверяет, что бин реализации {@link OllamaChatModel} создан.
+     * В тестовом профиле может быть null (заменен на мок).
      */
     @Test
     void testChatModelBean() {
         assertMocksCreated();
-        // В тестовом профиле OllamaChatModel может быть null (не создается)
         if (ollamaChatModel != null) {
             logger.info("OllamaChatModel created: {}", ollamaChatModel);
         } else {
@@ -103,6 +103,7 @@ class AiConfigTest extends BaseTest {
 
     /**
      * Проверяет корректность создания {@link OllamaApi}.
+     * В тестовом профиле может быть null (заменен на мок).
      */
     @Test
     void testOllamaApiUrl() {

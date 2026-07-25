@@ -17,13 +17,38 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
+/**
+ * Конфигурация AI компонентов для приложения.
+ *
+ * <p>Настраивает следующие компоненты:
+ * <ul>
+ *   <li>Ollama API клиент для взаимодействия с LLM</li>
+ *   <li>Ollama Chat Model для генерации ответов</li>
+ *   <li>ChatClient для высокоуровневой работы с чатом</li>
+ *   <li>PgVectorStore для хранения и поиска эмбеддингов</li>
+ *   <li>Тестовый DataSource для профиля test</li>
+ * </ul>
+ *
+ * <p>Важно: в тестовом профиле (test) создаются только необходимые бины,
+ * остальные заменяются на моки для изоляции тестов.
+ *
+ * @author RAG Application Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Configuration
 public class AiConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AiConfig.class);
 
-    // === БАЗОВЫЕ БИНЫ (НЕ создаем в тестовом профиле) ===
-
+    /**
+     * Создает клиент для Ollama API.
+     * Используется для низкоуровневого взаимодействия с Ollama сервером.
+     *
+     * <p>Не создается в тестовом профиле, так как заменяется на мок.</p>
+     *
+     * @return экземпляр {@link OllamaApi}
+     */
     @Bean
     @Profile("!test")
     public OllamaApi ollamaApi() {
@@ -38,6 +63,15 @@ public class AiConfig {
         }
     }
 
+    /**
+     * Создает модель чата для Ollama.
+     * Используется для генерации ответов на основе запросов пользователя.
+     *
+     * <p>Не создается в тестовом профиле, так как заменяется на мок.</p>
+     *
+     * @param ollamaApi клиент для Ollama API
+     * @return экземпляр {@link OllamaChatModel}
+     */
     @Bean
     @Profile("!test")
     public OllamaChatModel chatModel(OllamaApi ollamaApi) {
@@ -56,6 +90,15 @@ public class AiConfig {
         }
     }
 
+    /**
+     * Создает высокоуровневый клиент для работы с чатом.
+     * Обеспечивает Fluent API для построения запросов к LLM.
+     *
+     * <p>Не создается в тестовом профиле, так как заменяется на мок.</p>
+     *
+     * @param chatModel модель чата
+     * @return экземпляр {@link ChatClient}
+     */
     @Bean
     @Profile("!test")
     public ChatClient chatClient(OllamaChatModel chatModel) {
@@ -68,8 +111,16 @@ public class AiConfig {
         }
     }
 
-    // === ✅ PgVectorStore (постоянное хранилище, НЕ создаем в тестовом профиле) ===
-
+    /**
+     * Создает векторное хранилище на основе pgvector.
+     * Используется для хранения и поиска эмбеддингов документов.
+     *
+     * <p>Не создается в тестовом профиле, так как заменяется на мок.</p>
+     *
+     * @param jdbcTemplate   шаблон JDBC для работы с базой данных
+     * @param embeddingModel модель для создания эмбеддингов
+     * @return экземпляр {@link VectorStore}
+     */
     @Bean
     @Profile("!test")
     public VectorStore vectorStore(JdbcTemplate jdbcTemplate, EmbeddingModel embeddingModel) {
@@ -86,8 +137,15 @@ public class AiConfig {
         }
     }
 
-    // === ТЕСТОВЫЙ DataSource (только для профиля test) ===
-
+    /**
+     * Создает DataSource для тестового профиля.
+     * Использует H2 в памяти с режимом совместимости с PostgreSQL.
+     *
+     * <p>Создается только в тестовом профиле и помечен как {@link Primary},
+     * чтобы переопределить основной DataSource.</p>
+     *
+     * @return экземпляр {@link DataSource} для H2
+     */
     @Bean
     @Primary
     @Profile("test")
