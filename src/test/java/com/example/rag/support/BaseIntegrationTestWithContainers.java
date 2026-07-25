@@ -1,7 +1,6 @@
 package com.example.rag.support;
 
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.Embedding;
@@ -9,7 +8,10 @@ import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -21,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
 import com.example.rag.Application;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -29,7 +32,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>Архитектурные решения:
  * <ul>
- *   <li>Использование @MockBean для изоляции от реальных LLM (Ollama)</li>
+ *   <li>Использование вложенной конфигурации {@code MockConfig} для изоляции от LLM</li>
  *   <li>Настройка моков через @BeforeEach для гарантии чистоты состояния</li>
  *   <li>Динамическая конфигурация через @DynamicPropertySource</li>
  *   <li>Поддержка опционального запуска Ollama для реальных интеграционных тестов</li>
@@ -39,21 +42,77 @@ import static org.mockito.Mockito.when;
  * @version 2.0
  * @since 1.0
  */
-@SpringBootTest(classes = Application.class)
+@SpringBootTest(classes = {Application.class, BaseIntegrationTestWithContainers.MockConfig.class})
 @ActiveProfiles("integration-test")
 @Testcontainers
 @SuppressWarnings({"resource", "unused"})
 public abstract class BaseIntegrationTestWithContainers {
 
+    /**
+     * Логгер для всех тестовых классов.
+     */
     protected final Logger logger = LoggerFactory.getLogger(getClass());
+
+    /**
+     * Конфигурация для мока EmbeddingModel.
+     *
+     * <p>Использует {@code @Primary} на уровне метода для гарантии,
+     * что мок будет использоваться вместо реального бина.</p>
+     */
+    @Configuration
+    @Profile("integration-test")
+    public static class MockConfig {
+
+        /**
+         * Создает мок для EmbeddingModel с @Primary.
+         *
+         * <p>Мок настраивается на все методы EmbeddingModel:
+         * <ul>
+         *   <li>{@code embed(String)} - возвращает float[]</li>
+         *   <li>{@code embed(List<String>)} - возвращает List<float[]></li>
+         *   <li>{@code call(EmbeddingRequest)} - возвращает EmbeddingResponse</li>
+         * </ul>
+         * </p>
+         *
+         * @return мок для EmbeddingModel с @Primary
+         */
+        @Bean
+        @Primary
+        public EmbeddingModel embeddingModel() {
+            EmbeddingModel mock = mock(EmbeddingModel.class);
+
+            // Генерируем детерминированный вектор для воспроизводимости
+            float[] mockEmbedding = generateDeterministicEmbedding();
+
+            // Создаем Embedding объект
+            Embedding mockEmbeddingObj = new Embedding(mockEmbedding, 0);
+            EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
+
+            // Настраиваем все методы
+            when(mock.embed(any(String.class))).thenReturn(mockEmbedding);
+            when(mock.embed(any(List.class))).thenReturn(List.of(mockEmbedding));
+            when(mock.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
+
+            return mock;
+        }
+
+        /**
+         * Генерирует детерминированный вектор для воспроизводимости тестов.
+         *
+         * @return массив float размером 768 с детерминированными значениями
+         */
+        private static float[] generateDeterministicEmbedding() {
+            float[] embedding = new float[768];
+            for (int i = 0; i < embedding.length; i++) {
+                embedding[i] = (float) (Math.sin(i) * 0.5 + 0.5);
+            }
+            return embedding;
+        }
+    }
 
     /**
      * PostgreSQL контейнер с pgvector.
      * Используется для тестирования с реальной БД.
-     *
-     * <p>Аннотация {@code @Container} управляет жизненным циклом контейнера.
-     * Предупреждение IDE о try-with-resources игнорируется, так как
-     * Testcontainers управляет ресурсами автоматически.</p>
      */
     @Container
     protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
@@ -68,22 +127,8 @@ public abstract class BaseIntegrationTestWithContainers {
                     .withReuse(true);
 
     /**
-     * Мок для EmbeddingModel - КЛЮЧЕВОЙ КОМПОНЕНТ!
-     * Изолирует тесты от реального Ollama.
-     *
-     * <p>Используется {@code @MockBean} для создания мока вместо реального бина.
-     * В тестовом контексте этот мок автоматически переопределяет реальный бин.</p>
-     */
-    @MockBean
-    protected EmbeddingModel embeddingModel;
-
-    /**
      * Ollama контейнер - опциональный.
      * Запускается только если нужны реальные LLM тесты.
-     *
-     * <p>Аннотация {@code @Container} управляет жизненным циклом контейнера.
-     * Предупреждение IDE о try-with-resources игнорируется, так как
-     * Testcontainers управляет ресурсами автоматически.</p>
      */
     @Container
     protected static final GenericContainer<?> OLLAMA_CONTAINER =
@@ -117,9 +162,7 @@ public abstract class BaseIntegrationTestWithContainers {
         // Flyway отключен
         registry.add("spring.flyway.enabled", () -> "false");
 
-        // ============================================================
-        // КЛЮЧЕВОЕ: ОТКЛЮЧАЕМ РЕАЛЬНЫЕ ЭМБЕДДИНГИ
-        // ============================================================
+        // Отключаем реальные эмбеддинги
         registry.add("spring.ai.ollama.base-url", () -> "http://localhost:11434");
         registry.add("spring.ai.ollama.embedding.enabled", () -> "false");
         registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
@@ -131,54 +174,6 @@ public abstract class BaseIntegrationTestWithContainers {
         registry.add("spring.ai.vectorstore.pgvector.table-name", () -> "vector_store");
         registry.add("spring.ai.vectorstore.pgvector.drop-table", () -> "true");
         registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
-    }
-
-    /**
-     * Настройка мока перед каждым тестом.
-     * Создает фиктивные эмбеддинги для изоляции от Ollama.
-     */
-    @BeforeEach
-    void setUpMock() {
-        // Генерируем детерминированный вектор для воспроизводимости
-        float[] mockEmbedding = generateDeterministicEmbedding();
-
-        // Создаем Embedding объект
-        Embedding mockEmbeddingObj = new Embedding(mockEmbedding, 0);
-
-        // Создаем EmbeddingResponse
-        EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
-
-        // ============================================================
-        // НАСТРОЙКА ВСЕХ МЕТОДОВ EmbeddingModel
-        // ============================================================
-
-        // 1. Для метода embed(String text) - возвращает float[]
-        when(embeddingModel.embed(any(String.class))).thenReturn(mockEmbedding);
-
-        // 2. Для метода embed(List<String> texts) - возвращает List<float[]>
-        @SuppressWarnings("unchecked")
-        List<String> anyStringList = any(List.class);
-        when(embeddingModel.embed(anyStringList)).thenReturn(List.of(mockEmbedding));
-
-        // 3. Для метода call(EmbeddingRequest request) - возвращает EmbeddingResponse
-        when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
-
-        logger.info("🔧 EmbeddingModel mock configured with deterministic vector");
-        logger.debug("📊 Vector dimension: {}", mockEmbedding.length);
-        logger.debug("📊 Mock response contains {} embeddings", mockResponse.getResults().size());
-    }
-
-    /**
-     * Генерирует детерминированный вектор для воспроизводимости тестов.
-     * Использует фиксированное seed для гарантии одинаковых результатов.
-     */
-    private float[] generateDeterministicEmbedding() {
-        float[] embedding = new float[768];
-        for (int i = 0; i < embedding.length; i++) {
-            // Детерминированное значение на основе индекса
-            embedding[i] = (float) (Math.sin(i) * 0.5 + 0.5);
-        }
-        return embedding;
     }
 
     /**
