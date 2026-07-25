@@ -134,7 +134,6 @@ jobs:
       - name: Run Integration Tests
         run: |
           mvn verify -Pintegration-tests \
-            -Dtest="**/*IntegrationTest.java" \
             -Dspring.profiles.active=integration-test \
             -DfailIfNoTests=false
 

@@ -130,10 +130,14 @@
         </profile>
 
         <!-- ========================================= -->
-        <!-- CI/CD ПРОФИЛЬ - ИСКЛЮЧАЕТ ИНТЕГРАЦИОННЫЕ ТЕСТЫ -->
+        <!-- CI ПРОФИЛЬ - ТОЛЬКО UNIT ТЕСТЫ            -->
         <!-- ========================================= -->
         <profile>
             <id>ci</id>
+            <properties>
+                <skipITs>true</skipITs>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -141,14 +145,11 @@
                         <artifactId>maven-surefire-plugin</artifactId>
                         <configuration>
                             <testFailureIgnore>false</testFailureIgnore>
-                            <!-- Исключаем все интеграционные и performance тесты в CI -->
                             <excludes>
-                                <exclude>**/integration/**/*IntegrationTest.java</exclude>
                                 <exclude>**/*IntegrationTest.java</exclude>
                                 <exclude>**/*PerformanceTest.java</exclude>
-                                <exclude>**/integration/**/*PerformanceTest.java</exclude>
+                                <exclude>**/integration/**/*.java</exclude>
                             </excludes>
-                            <!-- Запускаем только unit тесты -->
                             <includes>
                                 <include>**/*Test.java</include>
                                 <include>**/config/*Test.java</include>
@@ -156,10 +157,40 @@
                                 <include>**/service/*Test.java</include>
                                 <include>**/entity/*Test.java</include>
                             </includes>
-                            <!-- Отключаем JaCoCo в CI для скорости -->
                             <systemPropertyVariables>
                                 <jacoco.skip>true</jacoco.skip>
                             </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <skipITs>true</skipITs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- ИНТЕГРАЦИОННЫЕ ТЕСТЫ (локально)            -->
+        <!-- ========================================= -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <skipITs>false</skipITs>
+                            <includes>
+                                <include>**/*IntegrationTest.java</include>
+                            </includes>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -185,6 +216,87 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- ПОЛНЫЙ ПРОФИЛЬ (все тесты)                -->
+        <!-- ========================================= -->
+        <profile>
+            <id>full</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/*Test.java</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/*PerformanceTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <skipITs>false</skipITs>
+                            <includes>
+                                <include>**/*IntegrationTest.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Остальные профили (dev, prod, sonarcloud, etc.) -->
+        <profile>
+            <id>dev</id>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+
+        <profile>
+            <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>test</id>
+            <properties>
+                <spring.profiles.active>test</spring.profiles.active>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>sonarcloud</id>
+            <properties>
+                <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+                <sonar.organization>tomas-mart</sonar.organization>
+                <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>sonar-local</id>
+            <properties>
+                <sonar.host.url>http://localhost:9000</sonar.host.url>
+                <sonar.projectKey>llm-rag-spring-local</sonar.projectKey>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
         </profile>
 
     </profiles>
@@ -571,12 +683,21 @@
                 <version>3.2.5</version>
                 <configuration>
                     <testFailureIgnore>false</testFailureIgnore>
+                    <!-- По умолчанию: только Unit тесты -->
                     <excludes>
                         <exclude>**/*IntegrationTest.java</exclude>
+                        <exclude>**/*PerformanceTest.java</exclude>
+                        <exclude>**/integration/**/*.java</exclude>
                     </excludes>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
                 </configuration>
             </plugin>
 
+            <!-- ========================================= -->
+            <!-- FAILSAFE - ИНТЕГРАЦИОННЫЕ ТЕСТЫ            -->
+            <!-- ========================================= -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -586,6 +707,9 @@
                     <includes>
                         <include>**/*IntegrationTest.java</include>
                     </includes>
+                    <excludes>
+                        <exclude>**/*PerformanceTest.java</exclude>
+                    </excludes>
                 </configuration>
                 <executions>
                     <execution>

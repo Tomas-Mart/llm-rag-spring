@@ -144,9 +144,6 @@ public abstract class BaseIntegrationTestWithContainers {
         // 3. Для метода call(EmbeddingRequest request) - возвращает EmbeddingResponse
         when(embeddingModel.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
 
-        // 4. Для метода getDefaultOptions() - возвращает не null
-        // когда(embeddingModel.getDefaultOptions()).thenReturn(null);
-
         logger.info("🔧 EmbeddingModel mock configured with deterministic vector");
         logger.debug("📊 Vector dimension: {}", mockEmbedding.length);
         logger.debug("📊 Mock response contains {} embeddings", mockResponse.getResults().size());
