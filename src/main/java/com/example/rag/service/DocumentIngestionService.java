@@ -8,7 +8,6 @@ import java.util.Optional;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,9 +54,6 @@ public class DocumentIngestionService {
      * Сервис для OCR распознавания текста из изображений.
      */
     private final OcrService ocrService;
-
-    @Autowired
-    private DocumentIngestionService self;
 
     /**
      * Загружает и обрабатывает документ.
@@ -106,11 +102,11 @@ public class DocumentIngestionService {
             // 5. Разбиваем на чанки
             List<Document> chunks = splitDocumentIntoChunks(document);
 
-            // 6. Сохраняем эмбеддинги
-            self.saveEmbeddings(chunks, fileName);
+            // 6. Сохраняем эмбеддинги (вызываем напрямую)
+            saveEmbeddings(chunks, fileName);
 
-            // 7. Сохраняем метаданные
-            self.saveDocumentMetadata(content, fileName, metadata);
+            // 7. Сохраняем метаданные (вызываем напрямую)
+            saveDocumentMetadata(content, fileName, metadata);
 
             log.info("✅ Документ '{}' загружен успешно", fileName);
 
