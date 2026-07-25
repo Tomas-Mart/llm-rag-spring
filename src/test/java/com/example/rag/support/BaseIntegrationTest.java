@@ -80,9 +80,7 @@ public abstract class BaseIntegrationTest {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     // Lombok @Slf4j предоставляет статическое поле 'log' для нестатических методов
-    // Однако оно private, поэтому наследники должны использовать logger или методы логирования
 
-    // ... остальной код без изменений ...
     // ============================================================
     // TESTCONTAINERS
     // ============================================================

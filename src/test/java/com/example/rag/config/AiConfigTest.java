@@ -1,12 +1,10 @@
 package com.example.rag.config;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.ollama.OllamaChatModel;
-import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.rag.support.BaseTest;
 
@@ -18,258 +16,229 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Тестируемые компоненты:
  * <ul>
- *   <li>{@link OllamaApi} - API клиент для Ollama</li>
- *   <li>{@link OllamaChatModel} - Модель чата (реализация {@code ChatModel})</li>
- *   <li>{@link ChatClient} - Высокоуровневый Fluent API клиент для работы с чатом</li>
- *   <li>{@link OllamaChatOptions} - Опции конфигурации модели (параметры запроса)</li>
+ *   <li>{@code OllamaApi} - клиент для Ollama API</li>
+ *   <li>{@code OllamaChatModel} - модель чата</li>
+ *   <li>{@code ChatClient} - высокоуровневый клиент</li>
+ *   <li>{@code VectorStore} - векторное хранилище</li>
+ *   <li>{@code OllamaChatOptions} - опции конфигурации</li>
  * </ul>
  *
- * <p>Особенности тестирования:
- * <ul>
- *   <li>Используется реальная PostgreSQL через Testcontainers</li>
- *   <li>Все внешние зависимости (Ollama) замоканы для изоляции</li>
- *   <li>Проверяется корректность конфигурации из application-test.yml</li>
- * </ul>
- *
- * <p>В Spring AI 1.1.8:
- * <ul>
- *   <li>Модель Ollama используется через универсальный интерфейс {@code ChatModel}</li>
- *   <li>Добавлена поддержка новых параметров (think, reasoning)</li>
- *   <li>Сохранена обратная совместимость с предыдущими версиями</li>
- * </ul>
+ * <p>В тестовом профиле все компоненты заменены на моки.
  *
  * @author RAG Application Team
- * @version 3.0
+ * @version 4.0
  * @since 1.0
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class AiConfigTest extends BaseTest {
 
-    /**
-     * Клиент для работы с чатом (высокоуровневая абстракция Fluent API).
-     * Может быть {@code null} в некоторых тестовых конфигурациях,
-     * так как в тестовом профиле используется мок.
-     */
-    @Autowired(required = false)
-    private ChatClient chatClient;
+    @Autowired
+    private Environment environment;
 
-    /**
-     * Опции конфигурации Ollama.
-     * Может быть {@code null}, если кастомные опции не объявлялись как бин
-     * или используются стандартные настройки из application.yml.
-     */
     @Autowired(required = false)
     private OllamaChatOptions ollamaOptions;
 
-    /**
-     * Проверяет, что бин {@link OllamaApi} успешно создан.
-     * В тестовом профиле используется мок, поэтому проверяем только наличие.
-     */
+    // ============================================================
+    // ТЕСТЫ КОМПОНЕНТОВ (МОКИ)
+    // ============================================================
+
     @Test
     void testOllamaApiBean() {
-        assertMocksCreated();
-
         assertThat(ollamaApi)
-                .as("OllamaApi should be created (as mock)")
+                .as("OllamaApi mock should be created")
                 .isNotNull();
-
-        logger.info("✅ OllamaApi successfully created");
-        logger.debug("   OllamaApi type: {}", ollamaApi.getClass().getSimpleName());
+        assertThat(ollamaApi)
+                .as("OllamaApi should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
+        logger.info("✅ OllamaApi mock successfully created");
     }
 
-    /**
-     * Проверяет, что бин {@link OllamaChatModel} успешно создан.
-     * В тестовом профиле используется мок.
-     */
     @Test
     void testChatModelBean() {
-        assertMocksCreated();
-
         assertThat(ollamaChatModel)
-                .as("OllamaChatModel should be created (as mock)")
+                .as("OllamaChatModel mock should be created")
                 .isNotNull();
-
-        logger.info("✅ OllamaChatModel successfully created");
-        logger.debug("   OllamaChatModel type: {}", ollamaChatModel.getClass().getSimpleName());
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
+        logger.info("✅ OllamaChatModel mock successfully created");
     }
 
-    /**
-     * Проверяет, что бин {@link ChatClient} создан.
-     *
-     * <p>ChatClient может отсутствовать в тестовом контексте,
-     * поэтому проверка выполняется только при его наличии.
-     */
     @Test
     void testChatClientBean() {
-        assertMocksCreated();
-
-        if (chatClient != null) {
-            assertThat(chatClient)
-                    .as("ChatClient should be created")
-                    .isNotNull();
-
-            logger.info("✅ ChatClient successfully created");
-            logger.debug("   ChatClient type: {}", chatClient.getClass().getSimpleName());
-        } else {
-            logger.warn("⚠️ ChatClient is not available in test context (expected with mocks)");
-        }
+        assertThat(chatClient)
+                .as("ChatClient mock should be created")
+                .isNotNull();
+        assertThat(chatClient)
+                .as("ChatClient should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
+        logger.info("✅ ChatClient mock successfully created");
     }
 
-    /**
-     * Проверяет корректность URL для Ollama API.
-     * В тестовом профиле используется мок, поэтому проверяем только наличие.
-     */
+    @Test
+    void testVectorStoreBean() {
+        assertThat(vectorStore)
+                .as("VectorStore mock should be created")
+                .isNotNull();
+        assertThat(vectorStore)
+                .as("VectorStore should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
+        logger.info("✅ VectorStore mock successfully created");
+    }
+
+    // ============================================================
+    // ТЕСТЫ КОНФИГУРАЦИИ
+    // ============================================================
+
     @Test
     void testOllamaApiUrl() {
-        assertMocksCreated();
-
-        // Получаем URL из конфигурации или используем значение по умолчанию
         String ollamaUrl = environment.getProperty(
                 "spring.ai.ollama.base-url",
                 "http://localhost:11434"
         );
 
-        logger.info("✅ OllamaApi configured with URL: {}", ollamaUrl);
-
-        // Проверяем, что URL соответствует ожидаемому
         assertThat(ollamaUrl)
                 .as("Ollama URL should be configured")
                 .isEqualTo("http://localhost:11434");
+
+        logger.info("✅ OllamaApi configured with URL: {}", ollamaUrl);
     }
 
-    /**
-     * Проверяет конфигурацию параметров {@link OllamaChatOptions}.
-     *
-     * <p>Если {@link OllamaChatOptions} не доступен (используются стандартные настройки),
-     * тест логирует предупреждение и завершается успешно.
-     *
-     * <p>Проверяемые параметры (если доступны):
-     * <ul>
-     *   <li>Модель: должна быть {@code qwen2.5-coder:7b}</li>
-     *   <li>Температура: должна быть {@code 0.2}</li>
-     *   <li>Размер контекста: {@code getNumCtx()} (необязательно)</li>
-     * </ul>
-     *
-     * <p>В Spring AI 1.1.8 также доступны новые параметры:
-     * <ul>
-     *   <li>{@code think} - режим рассуждений (для DeepSeek и др.)</li>
-     *   <li>{@code reasoningEffort} - уровень детализации рассуждений</li>
-     * </ul>
-     */
     @Test
     void testOllamaOptionsConfiguration() {
-        assertMocksCreated();
-
         if (ollamaOptions == null) {
-            logger.warn("⚠️ OllamaOptions is not available in test context (using defaults)");
-            // Проверяем, что свойства загружены из application.yml
+            // Проверяем через Environment
             String model = environment.getProperty("spring.ai.ollama.chat.options.model");
             assertThat(model)
-                    .as("Model should be configured in application.yml")
+                    .as("Model should be configured")
                     .isEqualTo("qwen2.5-coder:7b");
 
             Double temperature = environment.getProperty(
                     "spring.ai.ollama.chat.options.temperature", Double.class);
             assertThat(temperature)
-                    .as("Temperature should be configured in application.yml")
+                    .as("Temperature should be configured")
                     .isEqualTo(0.2);
+
+            Integer numCtx = environment.getProperty(
+                    "spring.ai.ollama.chat.options.num-ctx", Integer.class);
+            assertThat(numCtx)
+                    .as("Context size should be configured")
+                    .isEqualTo(4096);
 
             logger.info("✅ Ollama options configured via application.yml");
             logger.debug("   Model: {}", model);
             logger.debug("   Temperature: {}", temperature);
+            logger.debug("   Context size: {}", numCtx);
             return;
         }
 
-        assertThat(ollamaOptions)
-                .as("OllamaOptions should be created")
-                .isNotNull();
-
         assertThat(ollamaOptions.getModel())
-                .as("Model should be configured to qwen2.5-coder:7b")
+                .as("Model should be configured")
                 .isEqualTo("qwen2.5-coder:7b");
 
         assertThat(ollamaOptions.getTemperature())
-                .as("Temperature should be configured to 0.2")
+                .as("Temperature should be configured")
                 .isEqualTo(0.2);
+
+        assertThat(ollamaOptions.getNumCtx())
+                .as("Context size should be configured")
+                .isEqualTo(4096);
 
         logger.info("✅ OllamaOptions configured successfully");
         logger.debug("   Model: {}", ollamaOptions.getModel());
         logger.debug("   Temperature: {}", ollamaOptions.getTemperature());
         logger.debug("   Context size: {}", ollamaOptions.getNumCtx());
-        logger.debug("   Think mode: {}", ollamaOptions.getThinkOption());
     }
 
-    /**
-     * Проверяет, что Environment содержит все необходимые свойства.
-     * Дополнительный тест для проверки загрузки конфигурации.
-     */
     @Test
-    void testEnvironmentProperties() {
-        assertMocksCreated();
+    void testEmbeddingModelConfiguration() {
+        String embeddingModel = environment.getProperty(
+                "spring.ai.ollama.embedding.options.model",
+                "nomic-embed-text:v1.5"
+        );
 
-        // Проверяем базовые свойства
-        assertThat(environment.getProperty("spring.ai.ollama.base-url"))
-                .as("Ollama base URL should be configured")
-                .isEqualTo("http://localhost:11434");
+        assertThat(embeddingModel)
+                .as("Embedding model should be configured")
+                .isEqualTo("nomic-embed-text:v1.5");
 
-        assertThat(environment.getProperty("spring.ai.ollama.chat.options.model"))
-                .as("Ollama model should be configured")
-                .isEqualTo("qwen2.5-coder:7b");
+        logger.info("✅ Embedding model configured: {}", embeddingModel);
+    }
 
-        assertThat(environment.getProperty("spring.ai.ollama.chat.options.temperature", Double.class))
-                .as("Ollama temperature should be configured")
-                .isEqualTo(0.2);
-
-        // Проверяем настройки векторного хранилища
-        assertThat(environment.getProperty("spring.ai.vectorstore.pgvector.dimensions", Integer.class))
+    @Test
+    void testVectorStoreConfiguration() {
+        Integer dimensions = environment.getProperty(
+                "spring.ai.vectorstore.pgvector.dimensions", Integer.class);
+        assertThat(dimensions)
                 .as("Vector dimensions should be configured")
                 .isEqualTo(768);
 
-        // Проверяем настройки базы данных
-        assertThat(environment.getProperty("spring.datasource.driver-class-name"))
-                .as("Database driver should be configured")
-                .isEqualTo("org.postgresql.Driver");
+        String indexType = environment.getProperty(
+                "spring.ai.vectorstore.pgvector.index-type");
+        assertThat(indexType)
+                .as("Index type should be configured")
+                .isEqualTo("HNSW");
+
+        String distanceType = environment.getProperty(
+                "spring.ai.vectorstore.pgvector.distance-type");
+        assertThat(distanceType)
+                .as("Distance type should be configured")
+                .isEqualTo("EUCLIDEAN_DISTANCE");
+
+        logger.info("✅ VectorStore configured: dimensions={}, index={}, distance={}",
+                dimensions, indexType, distanceType);
+    }
+
+    // ============================================================
+    // КОМПЛЕКСНЫЕ ТЕСТЫ
+    // ============================================================
+
+    @Test
+    void testEnvironmentProperties() {
+        assertThat(environment.getProperty("spring.ai.ollama.base-url"))
+                .isEqualTo("http://localhost:11434");
+
+        assertThat(environment.getProperty("spring.ai.ollama.chat.options.model"))
+                .isEqualTo("qwen2.5-coder:7b");
+
+        assertThat(environment.getProperty("spring.ai.ollama.chat.options.temperature", Double.class))
+                .isEqualTo(0.2);
+
+        assertThat(environment.getProperty("spring.ai.vectorstore.pgvector.dimensions", Integer.class))
+                .isEqualTo(768);
+
+        assertThat(environment.getProperty("spring.ai.ollama.embedding.options.model"))
+                .isEqualTo("nomic-embed-text:v1.5");
 
         logger.info("✅ All environment properties verified successfully");
     }
 
-    /**
-     * Проверяет, что все компоненты AI конфигурации корректно взаимодействуют.
-     * Интеграционный тест для проверки связей между компонентами.
-     */
     @Test
     void testAIConfigurationIntegration() {
-        assertMocksCreated();
+        // Проверяем наличие бинов
+        assertThat(applicationContext.containsBean("ollamaApi")).isTrue();
+        assertThat(applicationContext.containsBean("ollamaChatModel")).isTrue();
+        assertThat(applicationContext.containsBean("vectorStore")).isTrue();
+        assertThat(applicationContext.containsBean("chatClient")).isTrue();
 
-        // Проверяем, что все бины созданы
-        assertThat(applicationContext)
-                .as("Application context should be loaded")
-                .isNotNull();
+        // Проверяем, что бины - это моки
+        assertThat(applicationContext.getBean("ollamaApi"))
+                .as("OllamaApi should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
 
-        // Проверяем наличие AI бинов
-        assertThat(applicationContext.containsBean("ollamaApi"))
-                .as("OllamaApi bean should exist")
-                .isTrue();
+        assertThat(applicationContext.getBean("ollamaChatModel"))
+                .as("OllamaChatModel should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
 
-        assertThat(applicationContext.containsBean("ollamaChatModel"))
-                .as("OllamaChatModel bean should exist")
-                .isTrue();
+        assertThat(applicationContext.getBean("vectorStore"))
+                .as("VectorStore should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
 
-        // Проверяем, что векторное хранилище настроено
-        assertThat(applicationContext.containsBean("vectorStore"))
-                .as("VectorStore bean should exist")
-                .isTrue();
+        assertThat(applicationContext.getBean("chatClient"))
+                .as("ChatClient should be a mock")
+                .isInstanceOf(org.mockito.Mockito.class);
 
-        // Проверяем наличие ChatClient, если он должен быть создан
-        if (chatClient != null) {
-            assertThat(applicationContext.containsBean("chatClient"))
-                    .as("ChatClient bean should exist")
-                    .isTrue();
-        }
-
-        logger.info("✅ All AI components are properly configured");
+        logger.info("✅ All AI components are properly configured as mocks");
         logger.debug("   Bean count: {}", applicationContext.getBeanDefinitionCount());
-        logger.debug("   AI related beans: ollamaApi, ollamaChatModel, vectorStore");
     }
 }

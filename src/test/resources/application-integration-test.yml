@@ -1,19 +1,35 @@
+# ============================================================
+# КОНФИГУРАЦИЯ ДЛЯ ИНТЕГРАЦИОННЫХ ТЕСТОВ
+# ============================================================
+# Используется для полноценных интеграционных тестов.
+# Подключается к существующему контейнеру PostgreSQL.
+# Flyway включен для управления схемой.
+# ============================================================
+
 spring:
   application:
     name: llm-rag-spring-integration-test
 
+  # ============================================================
+  # НАСТРОЙКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ
+  # ============================================================
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/rag_integration_test
+    url: jdbc:postgresql://localhost:32768/rag_integration_test
     username: test_user
     password: test_password
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
       connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      idle-timeout: 600000          # 10 минут
+      max-lifetime: 1800000         # 30 минут
 
+  # ============================================================
+  # НАСТРОЙКА JPA / HIBERNATE
+  # ============================================================
+  # validate - проверяет схему без изменений (Flyway управляет)
+  # ============================================================
   jpa:
     hibernate:
       ddl-auto: validate
@@ -23,11 +39,16 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
-          batch_size: 50
+          batch_size: 50            # Увеличен для производительности
         order_inserts: true
         order_updates: true
-        generate_statistics: true
+        generate_statistics: true   # Сбор статистики для анализа
 
+  # ============================================================
+  # НАСТРОЙКА FLYWAY
+  # ============================================================
+  # Управляет миграциями базы данных
+  # ============================================================
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -36,6 +57,11 @@ spring:
     clean-disabled: false
     clean-on-validation-error: true
 
+  # ============================================================
+  # НАСТРОЙКА AI КОМПОНЕНТОВ (OLLAMA)
+  # ============================================================
+  # Использует переменные окружения с значениями по умолчанию
+  # ============================================================
   ai:
     ollama:
       base-url: ${OLLAMA_URL:http://localhost:11434}
@@ -48,16 +74,22 @@ spring:
         options:
           model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text:v1.5}
 
+    # ============================================================
+    # НАСТРОЙКА ВЕКТОРНОГО ХРАНИЛИЩА (PGVECTOR)
+    # ============================================================
     vectorstore:
       pgvector:
         index-type: HNSW
         distance-type: EUCLIDEAN_DISTANCE
         dimensions: 768
         table-name: vector_store
-        drop-table: false  # Не дропаем таблицу в интеграционных тестах
+        drop-table: false           # Не удаляем таблицу (сохраняем данные)
         initialize-schema: true
         schema-name: public
 
+# ============================================================
+# НАСТРОЙКА ЛОГИРОВАНИЯ
+# ============================================================
 logging:
   level:
     org.springframework.ai: INFO
