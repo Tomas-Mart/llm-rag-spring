@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -26,13 +27,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Основные возможности:
  * <ul>
  *   <li>Загрузка Spring контекста с профилем {@code test}</li>
- *   <li>Моки для всех внешних зависимостей (Ollama, VectorStore, ChatClient)</li>
+ *   <li>Моки для всех внешних зависимостей (Ollama, VectorStore, ChatClient, EmbeddingModel)</li>
  *   <li>Подключение к существующему контейнеру PostgreSQL</li>
  *   <li>Быстрое выполнение благодаря мокам</li>
  * </ul>
  *
+ * <p>Важно: Для корректной загрузки контекста добавлен мок для {@link EmbeddingModel},
+ * который требуется для создания {@link VectorStore}.
+ *
  * @author RAG Application Team
- * @version 4.0
+ * @version 5.0
  * @since 1.0
  */
 @SpringBootTest
@@ -74,6 +78,13 @@ public abstract class BaseTest {
     @MockBean
     protected ChatClient chatClient;
 
+    /**
+     * Мок для EmbeddingModel.
+     * Добавлен для удовлетворения зависимости VectorStore.
+     */
+    @MockBean
+    protected EmbeddingModel embeddingModel;
+
     @Autowired(required = false)
     protected DataSource dataSource;
 
@@ -96,24 +107,46 @@ public abstract class BaseTest {
     // ============================================================
 
     protected void assertMocksCreated() {
-        assertThat(ollamaApi).isNotNull();
-        assertThat(ollamaChatModel).isNotNull();
-        assertThat(vectorStore).isNotNull();
-        assertThat(chatClient).isNotNull();
+        assertThat(ollamaApi)
+                .as("OllamaApi mock should be created")
+                .isNotNull();
+
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel mock should be created")
+                .isNotNull();
+
+        assertThat(vectorStore)
+                .as("VectorStore mock should be created")
+                .isNotNull();
+
+        assertThat(chatClient)
+                .as("ChatClient mock should be created")
+                .isNotNull();
+
+        assertThat(embeddingModel)
+                .as("EmbeddingModel mock should be created")
+                .isNotNull();
 
         logger.info("✅ All mocks created successfully");
         logger.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
         logger.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
         logger.debug("   - VectorStore: {}", vectorStore.getClass().getSimpleName());
         logger.debug("   - ChatClient: {}", chatClient.getClass().getSimpleName());
+        logger.debug("   - EmbeddingModel: {}", embeddingModel.getClass().getSimpleName());
     }
 
     protected void assertApplicationContextLoaded() {
-        assertThat(application).isNotNull();
-        assertThat(applicationContext).isNotNull();
+        assertThat(application)
+                .as("Application bean should be loaded")
+                .isNotNull();
+
+        assertThat(applicationContext)
+                .as("ApplicationContext should be loaded")
+                .isNotNull();
 
         logger.info("✅ Application context loaded successfully");
         logger.debug("   - Bean count: {}", applicationContext.getBeanDefinitionCount());
+        logger.debug("   - Application name: {}", applicationContext.getApplicationName());
     }
 
     protected void assertDataSourceAvailable() throws SQLException {
@@ -123,9 +156,17 @@ public abstract class BaseTest {
         }
 
         try (Connection connection = dataSource.getConnection()) {
-            assertThat(connection).isNotNull();
-            assertThat(connection.isValid(5)).isTrue();
+            assertThat(connection)
+                    .as("Database connection should be established")
+                    .isNotNull();
+            assertThat(connection.isValid(5))
+                    .as("Connection should be valid")
+                    .isTrue();
+
+            var metaData = connection.getMetaData();
             logger.info("✅ Database connection established successfully");
+            logger.debug("   Database URL: {}", metaData.getURL());
+            logger.debug("   Database Product: {}", metaData.getDatabaseProductName());
         } catch (SQLException e) {
             logger.error("❌ Failed to connect to database", e);
             throw e;

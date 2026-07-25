@@ -25,9 +25,10 @@ import static org.mockito.Mockito.mockingDetails;
  * </ul>
  *
  * <p>В тестовом профиле все компоненты заменены на моки.
+ * Используется реальный PostgreSQL из application-test.yml.
  *
  * @author RAG Application Team
- * @version 4.0
+ * @version 5.0
  * @since 1.0
  */
 @SpringBootTest
@@ -50,7 +51,6 @@ class AiConfigTest extends BaseTest {
                 .as("OllamaApi mock should be created")
                 .isNotNull();
 
-        // ✅ Правильная проверка, что объект является моком
         assertThat(mockingDetails(ollamaApi).isMock())
                 .as("OllamaApi should be a mock")
                 .isTrue();
@@ -64,7 +64,6 @@ class AiConfigTest extends BaseTest {
                 .as("OllamaChatModel mock should be created")
                 .isNotNull();
 
-        // ✅ Правильная проверка, что объект является моком
         assertThat(mockingDetails(ollamaChatModel).isMock())
                 .as("OllamaChatModel should be a mock")
                 .isTrue();
@@ -78,7 +77,6 @@ class AiConfigTest extends BaseTest {
                 .as("ChatClient mock should be created")
                 .isNotNull();
 
-        // ✅ Правильная проверка, что объект является моком
         assertThat(mockingDetails(chatClient).isMock())
                 .as("ChatClient should be a mock")
                 .isTrue();
@@ -92,7 +90,6 @@ class AiConfigTest extends BaseTest {
                 .as("VectorStore mock should be created")
                 .isNotNull();
 
-        // ✅ Правильная проверка, что объект является моком
         assertThat(mockingDetails(vectorStore).isMock())
                 .as("VectorStore should be a mock")
                 .isTrue();
@@ -101,7 +98,7 @@ class AiConfigTest extends BaseTest {
     }
 
     // ============================================================
-    // ТЕСТЫ КОНФИГУРАЦИИ
+    // ТЕСТЫ КОНФИГУРАЦИИ (из application-test.yml)
     // ============================================================
 
     @Test
@@ -202,6 +199,22 @@ class AiConfigTest extends BaseTest {
                 dimensions, indexType, distanceType);
     }
 
+    @Test
+    void testDataSourceConfiguration() {
+        // Проверяем, что используется реальный PostgreSQL, а не H2
+        String url = environment.getProperty("spring.datasource.url");
+        assertThat(url)
+                .as("DataSource should be PostgreSQL")
+                .contains("postgresql");
+
+        String driver = environment.getProperty("spring.datasource.driver-class-name");
+        assertThat(driver)
+                .as("Driver should be PostgreSQL")
+                .isEqualTo("org.postgresql.Driver");
+
+        logger.info("✅ DataSource configured with PostgreSQL: {}", url);
+    }
+
     // ============================================================
     // КОМПЛЕКСНЫЕ ТЕСТЫ
     // ============================================================
@@ -223,49 +236,35 @@ class AiConfigTest extends BaseTest {
         assertThat(environment.getProperty("spring.ai.ollama.embedding.options.model"))
                 .isEqualTo("nomic-embed-text:v1.5");
 
-        logger.info("✅ All environment properties verified successfully");
+        // Проверяем, что нет H2
+        assertThat(environment.getProperty("spring.datasource.url"))
+                .doesNotContain("h2");
+
+        logger.info("✅ All environment properties verified successfully (no H2)");
     }
 
     @Test
     void testAIConfigurationIntegration() {
-        // В тестовом профиле бины НЕ создаются в контексте Spring,
-        // они создаются как моки в BaseTest через @MockBean.
-        // Поэтому проверяем, что моки доступны через поля и являются моками.
-
-        assertThat(ollamaApi)
-                .as("OllamaApi mock should be available")
-                .isNotNull();
-
-        assertThat(ollamaChatModel)
-                .as("OllamaChatModel mock should be available")
-                .isNotNull();
-
-        assertThat(vectorStore)
-                .as("VectorStore mock should be available")
-                .isNotNull();
-
-        assertThat(chatClient)
-                .as("ChatClient mock should be available")
-                .isNotNull();
+        // Проверяем, что моки доступны
+        assertThat(ollamaApi).isNotNull();
+        assertThat(ollamaChatModel).isNotNull();
+        assertThat(vectorStore).isNotNull();
+        assertThat(chatClient).isNotNull();
 
         // Проверяем, что все это моки
-        assertThat(mockingDetails(ollamaApi).isMock())
-                .as("OllamaApi should be a mock")
-                .isTrue();
+        assertThat(mockingDetails(ollamaApi).isMock()).isTrue();
+        assertThat(mockingDetails(ollamaChatModel).isMock()).isTrue();
+        assertThat(mockingDetails(vectorStore).isMock()).isTrue();
+        assertThat(mockingDetails(chatClient).isMock()).isTrue();
 
-        assertThat(mockingDetails(ollamaChatModel).isMock())
-                .as("OllamaChatModel should be a mock")
-                .isTrue();
-
-        assertThat(mockingDetails(vectorStore).isMock())
-                .as("VectorStore should be a mock")
-                .isTrue();
-
-        assertThat(mockingDetails(chatClient).isMock())
-                .as("ChatClient should be a mock")
-                .isTrue();
+        // Проверяем, что DataSource реальный PostgreSQL
+        String url = environment.getProperty("spring.datasource.url");
+        assertThat(url).contains("postgresql");
+        assertThat(url).doesNotContain("h2");
 
         logger.info("✅ All AI components are properly configured as mocks");
+        logger.info("✅ Using real PostgreSQL (no H2)");
+        logger.debug("   DataSource URL: {}", url);
         logger.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
         logger.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
         logger.debug("   - VectorStore: {}", vectorStore.getClass().getSimpleName());

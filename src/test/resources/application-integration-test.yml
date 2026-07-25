@@ -15,7 +15,7 @@ spring:
   # ============================================================
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:32768/rag_integration_test
+    url: jdbc:postgresql://localhost:32769/rag_integration_test
     username: test_user
     password: test_password
     hikari:

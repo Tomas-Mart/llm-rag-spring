@@ -25,11 +25,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   <li>PgVectorStore для хранения и поиска эмбеддингов</li>
  * </ul>
  *
- * <p>Важно: В тестовом профиле (test) используются моки из {@code BaseTest}.
- * Все бины с аннотацией {@code @Profile("!test")} создаются только вне тестового профиля.
+ * <p>Важно:
+ * <ul>
+ *   <li>В тестовом профиле (test) используются моки из {@code BaseTest}</li>
+ *   <li>Все бины с аннотацией {@code @Profile("!test")} создаются только вне тестового профиля</li>
+ *   <li>H2 полностью исключен. Для тестов используется реальный PostgreSQL из application-test.yml</li>
+ * </ul>
  *
  * @author RAG Application Team
- * @version 2.0
+ * @version 3.0
  * @since 1.0
  */
 @Configuration
@@ -76,6 +80,7 @@ public class AiConfig {
                 .defaultOptions(OllamaChatOptions.builder()
                         .model("qwen2.5-coder:7b")
                         .temperature(0.2)
+                        .numCtx(4096)
                         .build())
                 .build();
     }
