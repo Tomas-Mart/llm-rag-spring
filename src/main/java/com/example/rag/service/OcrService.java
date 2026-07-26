@@ -139,10 +139,31 @@ public class OcrService {
      */
     public boolean isTesseractAvailable() {
         try {
-            var process = Runtime.getRuntime().exec(new String[]{"tesseract", "--version"});
-            return process.waitFor() == 0;
+            // ✅ ИСПРАВЛЕНО: Используем фиксированные пути вместо переменной PATH
+            String[] possiblePaths = {
+                    "/usr/bin/tesseract",
+                    "/usr/local/bin/tesseract",
+                    "/opt/homebrew/bin/tesseract",
+                    "/usr/share/tesseract-ocr/tesseract"
+            };
+
+            for (String tesseractPath : possiblePaths) {
+                File tesseractFile = new File(tesseractPath);
+                if (tesseractFile.exists() && tesseractFile.canExecute()) {
+                    Process process = Runtime.getRuntime().exec(new String[]{tesseractPath, "--version"});
+                    int exitCode = process.waitFor();
+                    if (exitCode == 0) {
+                        log.info("✅ Tesseract найден по пути: {}", tesseractPath);
+                        return true;
+                    }
+                }
+            }
+
+            log.warn("⚠️ Tesseract не найден в стандартных путях");
+            return false;
+
         } catch (Exception e) {
-            log.warn("⚠️ Tesseract не доступен: {}", e.getMessage());
+            log.warn("⚠️ Ошибка проверки Tesseract: {}", e.getMessage());
             return false;
         }
     }
