@@ -85,10 +85,17 @@ public class DocumentApiController {
             ));
 
         } catch (RuntimeException e) {
-            // ИСПРАВЛЕНО: Обрабатываем RuntimeException как "не найден"
-            log.warn("⚠️ [API] Документ не найден: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", "Документ с ID " + id + " не найден"));
+            // ✅ Если RuntimeException содержит "not found" - возвращаем 404
+            String message = e.getMessage();
+            if (message != null && message.toLowerCase().contains("not found")) {
+                log.warn("⚠️ [API] Документ не найден: {}", message);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Документ с ID " + id + " не найден"));
+            }
+            // Иначе - 500
+            log.error("❌ [API] Ошибка удаления документа: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Ошибка удаления: " + e.getMessage()));
 
         } catch (Exception e) {
             log.error("❌ [API] Ошибка удаления документа: {}", e.getMessage(), e);

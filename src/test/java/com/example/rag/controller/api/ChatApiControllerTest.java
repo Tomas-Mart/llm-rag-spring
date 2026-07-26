@@ -1,5 +1,6 @@
 package com.example.rag.controller.api;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,32 +69,29 @@ class ChatApiControllerTest extends BaseIntegrationTestWithContainers {
     void testAskQuestion_WithEmptyQuestion() throws Exception {
         // Arrange
         Map<String, String> request = Map.of("question", "");
-        when(ragService.ask("")).thenReturn("Please provide a valid question.");
 
-        // Act & Assert
+        // Act & Assert - ожидаем 400 для пустого вопроса
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.question").value(""))
-                .andExpect(jsonPath("$.answer").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Пожалуйста, задайте вопрос."));
 
         System.out.println("✅ Тест с пустым вопросом пройден");
     }
 
     @Test
     void testAskQuestion_WithNullQuestion() throws Exception {
-        // Arrange
-        Map<String, String> request = Map.of("question", (String) null);
-        when(ragService.ask(null)).thenReturn("Question cannot be null.");
+        // Arrange - создаем Map с null значением через HashMap
+        Map<String, String> request = new HashMap<>();
+        request.put("question", null);
 
-        // Act & Assert
+        // Act & Assert - ожидаем 400 для null вопроса
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.question").value(null))
-                .andExpect(jsonPath("$.answer").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Пожалуйста, задайте вопрос."));
 
         System.out.println("✅ Тест с null вопросом пройден");
     }
@@ -102,14 +100,13 @@ class ChatApiControllerTest extends BaseIntegrationTestWithContainers {
     void testAskQuestion_WithMissingQuestionField() throws Exception {
         // Arrange
         Map<String, String> request = Map.of("wrongField", "some value");
-        when(ragService.ask(null)).thenReturn("Question cannot be null.");
 
-        // Act & Assert
+        // Act & Assert - ожидаем 400
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.answer").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Пожалуйста, задайте вопрос."));  // ← Исправлено
 
         System.out.println("✅ Тест с отсутствующим полем question пройден");
     }
