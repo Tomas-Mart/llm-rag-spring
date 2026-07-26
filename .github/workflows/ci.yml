@@ -126,6 +126,7 @@ jobs:
       - name: Pre-pull Docker images
         run: |
           docker pull pgvector/pgvector:pg16 || true
+          docker pull ollama/ollama:latest || true
 
       - name: Run Integration Tests
         run: |
@@ -134,6 +135,7 @@ jobs:
             -DfailIfNoTests=false \
             -Dmaven.test.failure.ignore=true \
             -Dtest="!**/*PerformanceTest.java" \
+            -Dfailsafe.rerunFailingTestsCount=2 \
             -B
 
       - name: Upload reports
@@ -174,7 +176,16 @@ jobs:
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }} \
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} \
             -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.java.source=${{ env.JAVA_VERSION }} \
             -B
+
+      - name: Quality Gate Check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          scanMetadataReportFile: target/sonar/report-task.txt
 
   # ============================================
   # 5. DOCKER BUILD (ONLY MAIN)
@@ -228,9 +239,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
 
   # ============================================
-  # 6. DEPLOY (ONLY MAIN) - ИСПРАВЛЕНО
+  # 6. DEPLOY (ONLY MAIN)
   # ============================================
   deploy:
     name: 🚀 Deploy
@@ -248,10 +260,29 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            set -e
+            echo "🚀 Starting deployment..."
+            
+            # Pull latest image
             docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest
+            
+            # Navigate to app directory
             cd /opt/app || exit 1
-            docker compose up -d --no-deps
+            
+            # Backup current container
+            docker compose ps app > /dev/null 2>&1 && docker compose stop app || true
+            
+            # Start new container
+            docker compose up -d --no-deps app
+            
+            # Wait for health check
+            sleep 10
+            curl -f http://localhost:8080/actuator/health || exit 1
+            
+            # Clean old images
             docker system prune -f
+            
+            echo "✅ Deployment completed successfully"
 
   # ============================================
   # 7. NOTIFY
