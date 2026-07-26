@@ -36,8 +36,7 @@ public class DocumentController {
 
     private static final String MESSAGE_ATTR = "message";
     private static final String REDIRECT_HOME = "redirect:/";
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024; // 10MB
     private final DocumentIngestionService ingestionService;
 
     /**
