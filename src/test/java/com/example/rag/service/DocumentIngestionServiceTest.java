@@ -2,6 +2,8 @@ package com.example.rag.service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -457,5 +459,375 @@ class DocumentIngestionServiceTest {
         System.out.println("   - Исключение выброшено корректно");
         System.out.println("   - Данные НЕ сохранены в БД");
         System.out.println("   - Данные НЕ сохранены в векторном хранилище");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ reIngestDocument
+    // ============================================================
+
+    /**
+     * Тест перезагрузки документа.
+     * Проверяет, что старый документ удаляется, а новый загружается.
+     */
+    @Test
+    void testReIngestDocument_Success() throws DocumentIngestionException, IOException {
+        // Arrange
+        when(ocrService.isImageFile(any())).thenReturn(false);
+        String fileName = "support-document.txt";
+
+        // Act
+        ingestionService.reIngestDocument(testFile, testMetadata);
+
+        // Assert
+        verify(documentRepository).deleteByFileName(fileName);
+        verify(documentRepository).save(any(DocumentEntity.class));
+        verify(vectorStore).add(anyList());
+
+        System.out.println("✅ Тест перезагрузки документа пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ deleteDocument
+    // ============================================================
+
+    /**
+     * Тест удаления документа по ID.
+     * Проверяет, что документ успешно удаляется.
+     */
+    @Test
+    void testDeleteDocument_Success() {
+        // Arrange
+        Long documentId = 1L;
+        when(documentRepository.existsById(documentId)).thenReturn(true);
+
+        // Act
+        boolean result = ingestionService.deleteDocument(documentId);
+
+        // Assert
+        assertThat(result).isTrue();
+        verify(documentRepository).deleteById(documentId);
+
+        System.out.println("✅ Тест удаления документа по ID пройден");
+    }
+
+    /**
+     * Тест удаления несуществующего документа по ID.
+     * Проверяет, что возвращается false.
+     */
+    @Test
+    void testDeleteDocument_NotFound() {
+        // Arrange
+        Long documentId = 999L;
+        when(documentRepository.existsById(documentId)).thenReturn(false);
+
+        // Act
+        boolean result = ingestionService.deleteDocument(documentId);
+
+        // Assert
+        assertThat(result).isFalse();
+        verify(documentRepository, never()).deleteById(any());
+
+        System.out.println("✅ Тест удаления несуществующего документа пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ deleteDocumentByFileName
+    // ============================================================
+
+    /**
+     * Тест удаления документа по имени файла.
+     * Проверяет, что документ успешно удаляется.
+     */
+    @Test
+    void testDeleteDocumentByFileName_Success() {
+        // Arrange
+        String fileName = "test.txt";
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.of(new DocumentEntity()));
+
+        // Act
+        boolean result = ingestionService.deleteDocumentByFileName(fileName);
+
+        // Assert
+        assertThat(result).isTrue();
+        verify(documentRepository).deleteByFileName(fileName);
+
+        System.out.println("✅ Тест удаления документа по имени файла пройден");
+    }
+
+    /**
+     * Тест удаления несуществующего документа по имени файла.
+     * Проверяет, что возвращается false.
+     */
+    @Test
+    void testDeleteDocumentByFileName_NotFound() {
+        // Arrange
+        String fileName = "nonexistent.txt";
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.empty());
+
+        // Act
+        boolean result = ingestionService.deleteDocumentByFileName(fileName);
+
+        // Assert
+        assertThat(result).isFalse();
+        verify(documentRepository, never()).deleteByFileName(any());
+
+        System.out.println("✅ Тест удаления несуществующего документа по имени пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ documentExists
+    // ============================================================
+
+    /**
+     * Тест проверки существования документа.
+     * Проверяет, что возвращается true, если документ существует.
+     */
+    @Test
+    void testDocumentExists_WhenExists() {
+        // Arrange
+        String fileName = "test.txt";
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.of(new DocumentEntity()));
+
+        // Act
+        boolean exists = ingestionService.documentExists(fileName);
+
+        // Assert
+        assertThat(exists).isTrue();
+
+        System.out.println("✅ Тест проверки существования документа (true) пройден");
+    }
+
+    /**
+     * Тест проверки существования документа.
+     * Проверяет, что возвращается false, если документ не существует.
+     */
+    @Test
+    void testDocumentExists_WhenNotExists() {
+        // Arrange
+        String fileName = "nonexistent.txt";
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.empty());
+
+        // Act
+        boolean exists = ingestionService.documentExists(fileName);
+
+        // Assert
+        assertThat(exists).isFalse();
+
+        System.out.println("✅ Тест проверки существования документа (false) пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ getDocument
+    // ============================================================
+
+    /**
+     * Тест получения документа по ID.
+     * Проверяет, что возвращается Optional с документом.
+     */
+    @Test
+    void testGetDocument_Success() {
+        // Arrange
+        Long documentId = 1L;
+        DocumentEntity document = new DocumentEntity();
+        document.setId(documentId);
+        when(documentRepository.findById(documentId))
+                .thenReturn(Optional.of(document));
+
+        // Act
+        Optional<DocumentEntity> result = ingestionService.getDocument(documentId);
+
+        // Assert
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(documentId);
+
+        System.out.println("✅ Тест получения документа по ID пройден");
+    }
+
+    /**
+     * Тест получения несуществующего документа по ID.
+     * Проверяет, что возвращается пустой Optional.
+     */
+    @Test
+    void testGetDocument_NotFound() {
+        // Arrange
+        Long documentId = 999L;
+        when(documentRepository.findById(documentId))
+                .thenReturn(Optional.empty());
+
+        // Act
+        Optional<DocumentEntity> result = ingestionService.getDocument(documentId);
+
+        // Assert
+        assertThat(result).isEmpty();
+
+        System.out.println("✅ Тест получения несуществующего документа пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ getDocumentByFileName
+    // ============================================================
+
+    /**
+     * Тест получения документа по имени файла.
+     * Проверяет, что возвращается Optional с документом.
+     */
+    @Test
+    void testGetDocumentByFileName_Success() {
+        // Arrange
+        String fileName = "test.txt";
+        DocumentEntity document = new DocumentEntity();
+        document.setFileName(fileName);
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.of(document));
+
+        // Act
+        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName(fileName);
+
+        // Assert
+        assertThat(result).isPresent();
+        assertThat(result.get().getFileName()).isEqualTo(fileName);
+
+        System.out.println("✅ Тест получения документа по имени файла пройден");
+    }
+
+    /**
+     * Тест получения несуществующего документа по имени файла.
+     * Проверяет, что возвращается пустой Optional.
+     */
+    @Test
+    void testGetDocumentByFileName_NotFound() {
+        // Arrange
+        String fileName = "nonexistent.txt";
+        when(documentRepository.findByFileName(fileName))
+                .thenReturn(Optional.empty());
+
+        // Act
+        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName(fileName);
+
+        // Assert
+        assertThat(result).isEmpty();
+
+        System.out.println("✅ Тест получения несуществующего документа по имени пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ getAllDocuments
+    // ============================================================
+
+    /**
+     * Тест получения всех документов.
+     * Проверяет, что возвращается список всех документов.
+     */
+    @Test
+    void testGetAllDocuments() {
+        // Arrange
+        List<DocumentEntity> documents = List.of(
+                new DocumentEntity(),
+                new DocumentEntity(),
+                new DocumentEntity()
+        );
+        when(documentRepository.findAll()).thenReturn(documents);
+
+        // Act
+        List<DocumentEntity> result = ingestionService.getAllDocuments();
+
+        // Assert
+        assertThat(result).hasSize(3);
+        verify(documentRepository).findAll();
+
+        System.out.println("✅ Тест получения всех документов пройден");
+    }
+
+    /**
+     * Тест получения всех документов, когда список пуст.
+     * Проверяет, что возвращается пустой список.
+     */
+    @Test
+    void testGetAllDocuments_EmptyList() {
+        // Arrange
+        when(documentRepository.findAll()).thenReturn(List.of());
+
+        // Act
+        List<DocumentEntity> result = ingestionService.getAllDocuments();
+
+        // Assert
+        assertThat(result).isEmpty();
+
+        System.out.println("✅ Тест получения всех документов (пустой список) пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ clearAllDocuments
+    // ============================================================
+
+    /**
+     * Тест очистки всех документов.
+     * Проверяет, что метод deleteAll вызывается.
+     */
+    @Test
+    void testClearAllDocuments() {
+        // Act
+        ingestionService.clearAllDocuments();
+
+        // Assert
+        verify(documentRepository).deleteAll();
+
+        System.out.println("✅ Тест очистки всех документов пройден");
+    }
+
+    // ============================================================
+    // ТЕСТЫ ДЛЯ ДУБЛИКАТОВ
+    // ============================================================
+
+    /**
+     * Тест загрузки дубликата документа.
+     * Проверяет, что сервис выбрасывает исключение при попытке загрузить существующий документ.
+     */
+    @Test
+    void testIngestDocument_WhenDocumentAlreadyExists() {
+        // Arrange
+        when(ocrService.isImageFile(any())).thenReturn(false);
+        when(documentRepository.findByFileName("support-document.txt"))
+                .thenReturn(Optional.of(new DocumentEntity()));
+
+        // Act & Assert
+        assertThatThrownBy(() -> ingestionService.ingestDocument(testFile, testMetadata))
+                .isInstanceOf(DocumentIngestionException.class)
+                .hasMessageContaining("уже существует");
+
+        verify(documentRepository, never()).save(any(DocumentEntity.class));
+        verify(vectorStore, never()).add(anyList());
+
+        System.out.println("✅ Тест загрузки дубликата документа пройден");
+    }
+
+    /**
+     * Тест загрузки файла с превышением максимального размера.
+     * Проверяет, что сервис выбрасывает исключение.
+     */
+    @Test
+    void testIngestDocument_WhenFileTooLarge() {
+        // Arrange
+        byte[] largeContent = new byte[11 * 1024 * 1024]; // 11MB
+        MultipartFile largeFile = new MockMultipartFile(
+                "file",
+                "large.txt",
+                "text/plain",
+                largeContent
+        );
+
+        // Act & Assert
+        assertThatThrownBy(() -> ingestionService.ingestDocument(largeFile, testMetadata))
+                .isInstanceOf(DocumentIngestionException.class)
+                .hasMessageContaining("превышает");
+
+        verify(documentRepository, never()).save(any(DocumentEntity.class));
+        verify(vectorStore, never()).add(anyList());
+
+        System.out.println("✅ Тест превышения размера файла пройден");
     }
 }
