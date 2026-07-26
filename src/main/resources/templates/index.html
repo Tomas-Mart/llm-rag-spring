@@ -1,11 +1,19 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="ru" xmlns:th="http://www.thymeleaf.org" xml:lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>🌸 RAG Assistant</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap CSS с SRI -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+          crossorigin="anonymous">
+
+    <!-- Google Fonts с crossorigin -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;600&display=swap"
-          rel="stylesheet">
+          rel="stylesheet"
+          crossorigin="anonymous">
     <style>
         /* --- Общие стили --- */
         * {
@@ -581,21 +589,21 @@
                 <!-- Заголовок -->
                 <div class="text-center mb-4">
                     <h1 class="main-title">RAG Assistant</h1>
-                    <p class="subtitle">✨ Задай вопрос по загруженным документам ✨</p>
+                    <p class="subtitle text-dark">✨ Задай вопрос по загруженным документам ✨</p>
                 </div>
 
                 <!-- Сообщение о статусе -->
                 <div th:if="${message}" class="alert alert-dismissible fade show mt-3"
                      th:classappend="${message.startsWith('✅') ? 'alert-success' : 'alert-danger'}"
                      role="alert">
-                    <span th:text="${message}"></span>
+                    <span th:text="${message}" class="text-dark"></span>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
 
                 <!-- Форма вопроса -->
                 <form method="post" action="/ask">
                     <div class="input-group input-group-roses">
-                        <input type="text" name="question" class="form-control"
+                        <input type="text" id="questionInput" name="question" class="form-control"
                                placeholder="Введите ваш вопрос..." th:value="${question}" required>
                         <button type="submit" class="btn btn-rose">Отправить</button>
                     </div>
@@ -605,7 +613,7 @@
                 <div th:if="${answer}" class="card-answer">
                     <div class="card-header">📝 Ответ</div>
                     <div class="card-body">
-                        <p th:text="${answer}" style="white-space: pre-wrap;"></p>
+                        <p th:text="${answer}" style="white-space: pre-wrap;" class="text-dark"></p>
                     </div>
                 </div>
 
@@ -619,7 +627,7 @@
                     <h5>Загрузить документ</h5>
                     <form method="post" action="/api/documents/upload" enctype="multipart/form-data">
                         <div class="input-group input-group-upload">
-                            <input type="file" name="file" class="form-control" required>
+                            <input type="file" id="fileInput" name="file" class="form-control" required>
                             <button type="submit" class="btn btn-success-rose">Загрузить</button>
                         </div>
                     </form>

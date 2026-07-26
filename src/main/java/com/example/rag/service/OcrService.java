@@ -151,7 +151,6 @@ public class OcrService {
      */
     public boolean isTesseractAvailable() {
         try {
-            // ✅ ИСПРАВЛЕНО: Используем фиксированные пути вместо переменной PATH
             String[] possiblePaths = {
                     "/usr/bin/tesseract",
                     "/usr/local/bin/tesseract",
@@ -163,10 +162,16 @@ public class OcrService {
                 File tesseractFile = new File(tesseractPath);
                 if (tesseractFile.exists() && tesseractFile.canExecute()) {
                     Process process = Runtime.getRuntime().exec(new String[]{tesseractPath, "--version"});
-                    int exitCode = process.waitFor();
-                    if (exitCode == 0) {
-                        log.info("✅ Tesseract найден по пути: {}", tesseractPath);
-                        return true;
+                    try {
+                        int exitCode = process.waitFor();
+                        if (exitCode == 0) {
+                            log.info("✅ Tesseract найден по пути: {}", tesseractPath);
+                            return true;
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();  // ✅ Восстанавливаем статус прерывания
+                        log.warn("⚠️ Процесс проверки Tesseract был прерван: {}", e.getMessage());
+                        return false;
                     }
                 }
             }

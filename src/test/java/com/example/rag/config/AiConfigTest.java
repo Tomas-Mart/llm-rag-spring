@@ -115,9 +115,13 @@ class AiConfigTest extends BaseTest {
     }
 
     private void verifyOptionsFromBean() {
-        assertThat(ollamaOptions.getModel()).isEqualTo("qwen2.5-coder:7b");
-        assertThat(ollamaOptions.getTemperature()).isEqualTo(0.2);
-        assertThat(ollamaOptions.getNumCtx()).isEqualTo(4096);
+        assertThat(ollamaOptions)
+                .isNotNull()
+                .satisfies(options -> {
+                    assertThat(options.getModel()).isEqualTo("qwen2.5-coder:7b");
+                    assertThat(options.getTemperature()).isEqualTo(0.2);
+                    assertThat(options.getNumCtx()).isEqualTo(4096);
+                });
 
         log.info("✅ Options from bean: model={}, temp={}, ctx={}",
                 ollamaOptions.getModel(),

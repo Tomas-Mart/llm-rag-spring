@@ -3,6 +3,7 @@ package com.example.rag.service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.ai.document.Document;
@@ -315,7 +316,7 @@ public class DocumentIngestionService {
                 .text(content)
                 .metadata("fileName", fileName)
                 .metadata("metadata", metadata != null ? metadata : "")
-                .metadata("uploadedAt", LocalDateTime.now().toString())
+                .metadata("uploadedAt", LocalDateTime.now(ZoneId.of("UTC")).toString())
                 .build();
     }
 
@@ -375,9 +376,10 @@ public class DocumentIngestionService {
                 .content(content)
                 .fileName(fileName)
                 .metadata(metadata)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.of("UTC")))
                 .build();
         documentRepository.save(entity);
+
         log.debug("✅ Метаданные сохранены в БД");
     }
 

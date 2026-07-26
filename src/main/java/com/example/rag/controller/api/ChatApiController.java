@@ -16,6 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ChatApiController {
 
+    private static final String ERROR_KEY = "error";
+    private static final String QUESTION_KEY = "question";
+    private static final String ANSWER_KEY = "answer";
+
     private final RagService ragService;
 
     @PostMapping("/chat")
@@ -23,15 +27,15 @@ public class ChatApiController {
         // ✅ Проверка на null запроса
         if (request == null) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Неверный формат запроса"));
+                    .body(Map.of(ERROR_KEY, "Неверный формат запроса"));
         }
 
-        String question = request.get("question");
+        String question = request.get(QUESTION_KEY);
 
         // ✅ Проверка на null и пустую строку
         if (question == null || question.trim().isEmpty()) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Пожалуйста, задайте вопрос."));
+                    .body(Map.of(ERROR_KEY, "Пожалуйста, задайте вопрос."));
         }
 
         log.info("📝 [API] Вопрос: {}", question);
@@ -39,13 +43,13 @@ public class ChatApiController {
         try {
             String answer = ragService.ask(question);
             return ResponseEntity.ok(Map.of(
-                    "question", question,
-                    "answer", answer
+                    QUESTION_KEY, question,
+                    ANSWER_KEY, answer
             ));
         } catch (Exception e) {
             log.error("❌ [API] Ошибка: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }
 }
