@@ -186,15 +186,6 @@ jobs:
             target/site/jacoco-it/
           retention-days: 7
 
-      - name: Publish report
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Integration Tests
-          path: target/failsafe-reports/*.xml
-          reporter: java-junit
-          fail-on-error: false
-
   # ============================================
   # 4. SONARCLOUD
   # ============================================
