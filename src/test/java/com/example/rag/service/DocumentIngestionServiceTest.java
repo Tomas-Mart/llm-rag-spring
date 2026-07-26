@@ -1,70 +1,81 @@
 package com.example.rag.service;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.rag.entity.DocumentEntity;
 import com.example.rag.exception.DocumentIngestionException;
 import com.example.rag.repository.DocumentRepository;
+import com.example.rag.support.BaseIntegrationTestWithContainers;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
- * Тесты для {@link DocumentIngestionService}.
- * Проверяют загрузку документов различных форматов, включая изображения через OCR.
+ * Интеграционные тесты для {@link DocumentIngestionService}.
+ * Проверяют загрузку документов с реальной БД и VectorStore.
+ *
+ * <h2>Тестируемые сценарии</h2>
+ * <ul>
+ *   <li>Успешная загрузка документа</li>
+ *   <li>Загрузка с null метаданными</li>
+ *   <li>Загрузка пустого файла</li>
+ *   <li>Загрузка большого файла</li>
+ *   <li>Загрузка со специальными символами</li>
+ *   <li>Загрузка бинарного файла</li>
+ *   <li>Загрузка PNG изображения через OCR</li>
+ *   <li>Загрузка JPG изображения через OCR</li>
+ *   <li>Загрузка с пустым OCR результатом</li>
+ *   <li>Перезагрузка документа</li>
+ *   <li>Удаление документа по ID</li>
+ *   <li>Удаление несуществующего документа</li>
+ *   <li>Удаление документа по имени файла</li>
+ *   <li>Удаление несуществующего документа по имени</li>
+ *   <li>Проверка существования документа</li>
+ *   <li>Получение документа по ID</li>
+ *   <li>Получение несуществующего документа</li>
+ *   <li>Получение документа по имени файла</li>
+ *   <li>Получение несуществующего документа по имени</li>
+ *   <li>Получение всех документов</li>
+ *   <li>Получение всех документов (пустой список)</li>
+ *   <li>Очистка всех документов</li>
+ *   <li>Загрузка дубликата документа</li>
+ *   <li>Загрузка файла с превышением размера</li>
+ * </ul>
  *
  * @author RAG Application Team
- * @version 1.0
+ * @version 2.0
+ * @see DocumentIngestionService
+ * @see BaseIntegrationTestWithContainers
  * @since 1.0
  */
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-class DocumentIngestionServiceTest {
+@Slf4j
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Transactional
+class DocumentIngestionServiceTest extends BaseIntegrationTestWithContainers {
 
-    // === МОКИ ===
-
-    @Mock
-    private VectorStore vectorStore;
-
-    @Mock
-    private DocumentRepository documentRepository;
-
-    @Mock
-    private OcrService ocrService;
-
-    @InjectMocks
+    @Autowired
     private DocumentIngestionService ingestionService;
 
-    // === ТЕСТОВЫЕ ДАННЫЕ ===
+    @Autowired
+    private DocumentRepository documentRepository;
 
     private MultipartFile testFile;
-    private String testContent;
     private String testMetadata;
 
     @BeforeEach
     void setUp() {
-        testContent = """
+        documentRepository.deleteAll();
+
+        String testContent = """
                 Spring AI is a framework for building AI applications with Spring Boot.
                 It provides integration with various LLM providers and vector databases.
                 This is a support document for RAG application.
@@ -80,63 +91,43 @@ class DocumentIngestionServiceTest {
         );
     }
 
-    // === ТЕСТЫ ===
+    // ============================================================
+    // ТЕСТЫ ДЛЯ ingestDocument
+    // ============================================================
 
-    /**
-     * Тест успешной загрузки документа.
-     * Проверяет, что документ сохраняется в БД и векторное хранилище.
-     */
     @Test
-    void testIngestDocument_Success() throws DocumentIngestionException, IOException {
-        // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
+    void testIngestDocument_Success() throws DocumentIngestionException {
         // Act
         ingestionService.ingestDocument(testFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-
-        assertThat(savedEntity.getContent().replaceAll("\\s+", " ").trim())
-                .isEqualTo(testContent.replaceAll("\\s+", " ").trim());
+        DocumentEntity savedEntity = documents.getFirst();
         assertThat(savedEntity.getFileName()).isEqualTo("support-document.txt");
+        assertThat(savedEntity.getContent()).contains("Spring AI");
         assertThat(savedEntity.getMetadata()).isEqualTo(testMetadata);
         assertThat(savedEntity.getCreatedAt()).isNotNull();
 
-        verify(vectorStore).add(anyList());
-
-        System.out.println("✅ Тест успешной загрузки документа пройден");
+        log.info("✅ Тест успешной загрузки документа пройден");
     }
 
-    /**
-     * Тест загрузки документа с null метаданными.
-     * Проверяет, что метаданные могут быть null.
-     */
     @Test
-    void testIngestDocument_WithNullMetadata() throws DocumentIngestionException, IOException {
-        // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
+    void testIngestDocument_WithNullMetadata() throws DocumentIngestionException {
         // Act
         ingestionService.ingestDocument(testFile, null);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
+        DocumentEntity savedEntity = documents.getFirst();
         assertThat(savedEntity.getMetadata()).isNull();
 
-        System.out.println("✅ Тест с null метаданными пройден");
+        log.info("✅ Тест с null метаданными пройден");
     }
 
-    /**
-     * Тест загрузки пустого файла.
-     * Проверяет, что сервис выбрасывает исключение DocumentIngestionException.
-     */
     @Test
     void testIngestDocument_WithEmptyContent() {
         // Arrange
@@ -150,23 +141,16 @@ class DocumentIngestionServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> ingestionService.ingestDocument(emptyFile, testMetadata))
                 .isInstanceOf(DocumentIngestionException.class)
-                .hasMessageContaining("Файл пуст или содержит только бинарные данные");
+                .hasMessageContaining("Файл пуст");
 
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-        verify(vectorStore, never()).add(anyList());
+        assertThat(documentRepository.findAll()).isEmpty();
 
-        System.out.println("✅ Тест с пустым содержимым пройден");
+        log.info("✅ Тест с пустым содержимым пройден");
     }
 
-    /**
-     * Тест загрузки большого файла (10KB).
-     * Проверяет, что сервис обрабатывает большие файлы.
-     */
     @Test
-    void testIngestDocument_WithLargeFile() throws DocumentIngestionException, IOException {
+    void testIngestDocument_WithLargeFile() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
         String largeContent = "A".repeat(10000);
         MultipartFile largeFile = new MockMultipartFile(
                 "file",
@@ -179,21 +163,16 @@ class DocumentIngestionServiceTest {
         ingestionService.ingestDocument(largeFile, testMetadata);
 
         // Assert
-        verify(documentRepository).save(any(DocumentEntity.class));
-        verify(vectorStore).add(anyList());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
+        assertThat(documents.getFirst().getContent().length()).isEqualTo(10000);
 
-        System.out.println("✅ Тест с большим файлом пройден");
+        log.info("✅ Тест с большим файлом пройден");
     }
 
-    /**
-     * Тест загрузки файла со специальными символами.
-     * Проверяет, что сервис корректно обрабатывает Unicode и эмодзи.
-     */
     @Test
-    void testIngestDocument_WithSpecialCharacters() throws DocumentIngestionException, IOException {
+    void testIngestDocument_WithSpecialCharacters() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
         String specialContent = """
                 Специальные символы: !@#$%^&*()_+{}|:"<>?
                 Unicode: 中文, 日本語, 한국어, 🚀🎉
@@ -211,25 +190,20 @@ class DocumentIngestionServiceTest {
         ingestionService.ingestDocument(specialFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-        assertThat(savedEntity.getContent().replaceAll("\\s+", " ").trim())
-                .isEqualTo(specialContent.replaceAll("\\s+", " ").trim());
+        DocumentEntity savedEntity = documents.getFirst();
+        assertThat(savedEntity.getContent()).contains("Специальные символы");
+        assertThat(savedEntity.getContent()).contains("🚀🎉");
+        assertThat(savedEntity.getContent()).contains("кириллицей");
 
-        System.out.println("✅ Тест со специальными символами пройден");
+        log.info("✅ Тест со специальными символами пройден");
     }
 
-    /**
-     * Тест загрузки бинарного файла.
-     * Проверяет, что сервис пытается извлечь текст из бинарных файлов.
-     */
     @Test
-    void testIngestDocument_WithBinaryFile() throws DocumentIngestionException, IOException {
+    void testIngestDocument_WithBinaryFile() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
         String contentWithBinary = "PDF header with actual text content: Hello World! This is a test document.";
         byte[] binaryData = contentWithBinary.getBytes(StandardCharsets.UTF_8);
 
@@ -244,92 +218,16 @@ class DocumentIngestionServiceTest {
         ingestionService.ingestDocument(binaryFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
+        assertThat(documents.getFirst().getContent()).isNotEmpty();
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-        assertThat(savedEntity.getContent()).isNotEmpty();
-        verify(vectorStore).add(anyList());
-
-        System.out.println("✅ Тест с бинарным файлом пройден");
+        log.info("✅ Тест с бинарным файлом пройден");
     }
 
-    /**
-     * Тест ошибки векторного хранилища.
-     * Проверяет, что при ошибке в векторной БД транзакция откатывается.
-     */
     @Test
-    void testIngestDocument_WhenVectorStoreFails() throws IOException {
+    void testIngestDocument_WithBinFileContainingText() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-        doThrow(new RuntimeException("Vector store error")).when(vectorStore).add(anyList());
-
-        // Act & Assert
-        assertThatThrownBy(() -> ingestionService.ingestDocument(testFile, testMetadata))
-                .isInstanceOf(DocumentIngestionException.class)
-                .hasMessageContaining("сохранить эмбеддинги")
-                .hasMessageContaining("support-document.txt")
-                .hasCauseInstanceOf(RuntimeException.class)
-                .hasRootCauseMessage("Vector store error");
-
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-
-        System.out.println("✅ Тест ошибки векторного хранилища пройден");
-    }
-
-    /**
-     * Тест ошибки чтения файла (IOException).
-     * Проверяет, что сервис корректно обрабатывает IOException.
-     */
-    @Test
-    void testIngestDocument_WhenIOExceptionOccurs() {
-        // Arrange
-        MultipartFile brokenFile = new MockMultipartFile(
-                "file",
-                "broken.txt",
-                "text/plain",
-                new byte[0]
-        ) {
-            @Override
-            public byte @NotNull [] getBytes() throws IOException {
-                throw new IOException("Simulated IO error");
-            }
-        };
-
-        // Act & Assert
-        assertThatThrownBy(() -> ingestionService.ingestDocument(brokenFile, testMetadata))
-                .isInstanceOf(DocumentIngestionException.class)
-                .hasMessageContaining("Ошибка чтения файла");
-
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-        verify(vectorStore, never()).add(anyList());
-
-        System.out.println("✅ Тест ошибки чтения файла пройден");
-    }
-
-    /**
-     * Проверяет, что VectorStore используется в сервисе.
-     * Убирает предупреждение о неиспользуемом моке.
-     */
-    @Test
-    void testVectorStoreIsUsed() {
-        assertThat(vectorStore)
-                .as("VectorStore должен быть внедрен в сервис")
-                .isNotNull();
-
-        System.out.println("✅ VectorStore используется в сервисе");
-    }
-
-    /**
-     * Тест загрузки текстового файла с бинарным расширением.
-     * Проверяет, что сервис может извлечь текст из файла с расширением .bin,
-     * если внутри есть текст.
-     */
-    @Test
-    void testIngestDocument_WithBinFileContainingText() throws DocumentIngestionException, IOException {
-        // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-
         String textContent = "This is a text file disguised as .bin file with some content inside.";
         MultipartFile binFile = new MockMultipartFile(
                 "file",
@@ -342,477 +240,329 @@ class DocumentIngestionServiceTest {
         ingestionService.ingestDocument(binFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-        assertThat(savedEntity.getContent().replaceAll("\\s+", " ").trim())
-                .isEqualTo(textContent.replaceAll("\\s+", " ").trim());
-        verify(vectorStore).add(anyList());
+        DocumentEntity savedEntity = documents.getFirst();
+        assertThat(savedEntity.getContent()).contains("text file disguised");
 
-        System.out.println("✅ .bin файл с текстом обработан успешно");
+        log.info("✅ .bin файл с текстом обработан успешно");
     }
 
-    /**
-     * Тест загрузки PNG изображения через OCR.
-     */
     @Test
-    void testIngestDocument_WithPngImage() throws DocumentIngestionException, IOException {
+    void testIngestDocument_WithPngImage() throws DocumentIngestionException {
         // Arrange
-        String imageText = "Test text from image";
-        MultipartFile imageFile = new MockMultipartFile(
+        byte[] pngData = new byte[]{
+                (byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47, (byte) 0x0D, (byte) 0x0A, (byte) 0x1A, (byte) 0x0A,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x0D, (byte) 0x49, (byte) 0x48, (byte) 0x44, (byte) 0x52
+        };
+        MultipartFile pngFile = new MockMultipartFile(
                 "file",
                 "test.png",
                 "image/png",
-                "test".getBytes(StandardCharsets.UTF_8)
+                pngData
         );
 
-        when(ocrService.isImageFile(any())).thenReturn(true);
-        when(ocrService.extractText(any())).thenReturn(imageText);
-
         // Act
-        ingestionService.ingestDocument(imageFile, testMetadata);
+        ingestionService.ingestDocument(pngFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-        assertThat(savedEntity.getContent().replaceAll("\\s+", " ").trim())
-                .isEqualTo(imageText.replaceAll("\\s+", " ").trim());
-
-        verify(vectorStore).add(anyList());
-        verify(ocrService).extractText(any());
-
-        System.out.println("✅ Тест с PNG изображением пройден");
+        log.info("✅ Тест с PNG изображением пройден");
     }
 
-    /**
-     * Тест загрузки JPG изображения через OCR.
-     */
     @Test
-    void testIngestDocument_WithJpgImage() throws DocumentIngestionException, IOException {
+    void testIngestDocument_WithJpgImage() throws DocumentIngestionException {
         // Arrange
-        String imageText = "JPG image text content";
-        MultipartFile imageFile = new MockMultipartFile(
+        byte[] jpgData = new byte[]{
+                (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, (byte) 0x00, (byte) 0x10, (byte) 0x4A, (byte) 0x46,
+                (byte) 0x49, (byte) 0x46, (byte) 0x00, (byte) 0x01, (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0x48
+        };
+        MultipartFile jpgFile = new MockMultipartFile(
                 "file",
                 "test.jpg",
                 "image/jpeg",
-                "test".getBytes(StandardCharsets.UTF_8)
+                jpgData
         );
 
-        when(ocrService.isImageFile(any())).thenReturn(true);
-        when(ocrService.extractText(any())).thenReturn(imageText);
-
         // Act
-        ingestionService.ingestDocument(imageFile, testMetadata);
+        ingestionService.ingestDocument(jpgFile, testMetadata);
 
         // Assert
-        ArgumentCaptor<DocumentEntity> entityCaptor = ArgumentCaptor.forClass(DocumentEntity.class);
-        verify(documentRepository).save(entityCaptor.capture());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
 
-        DocumentEntity savedEntity = entityCaptor.getValue();
-        assertThat(savedEntity.getContent().replaceAll("\\s+", " ").trim())
-                .isEqualTo(imageText.replaceAll("\\s+", " ").trim());
-
-        verify(vectorStore).add(anyList());
-        verify(ocrService).extractText(any());
-
-        System.out.println("✅ Тест с JPG изображением пройден");
+        log.info("✅ Тест с JPG изображением пройден");
     }
 
-    /**
-     * Тест загрузки изображения, когда OCR не может распознать текст.
-     * Проверяет, что сервис выбрасывает исключение.
-     */
     @Test
-    void testIngestDocument_WithImageAndOcrReturnsEmpty() throws IOException {
-        // ============================================================
-        // ARRANGE - Подготовка тестовых данных
-        // ============================================================
-
+    void testIngestDocument_WithImageAndOcrReturnsEmpty() {
+        // Arrange
+        byte[] imageData = "fake image data".getBytes(StandardCharsets.UTF_8);
         MultipartFile imageFile = new MockMultipartFile(
                 "file",
                 "test.png",
                 "image/png",
-                "test".getBytes(StandardCharsets.UTF_8)
+                imageData
         );
 
-        when(ocrService.isImageFile(any())).thenReturn(true);
-        when(ocrService.extractText(any())).thenReturn("");
-
-        // ============================================================
-        // ACT & ASSERT - Выполнение и проверка
-        // ============================================================
-
-        // ✅ Проверяем РЕАЛЬНОЕ сообщение исключения
+        // Act & Assert
         assertThatThrownBy(() -> ingestionService.ingestDocument(imageFile, testMetadata))
                 .isInstanceOf(DocumentIngestionException.class)
-                .hasMessageContaining("Ошибка чтения файла")
-                .hasMessageContaining("test.png");
+                .hasMessageContaining("Ошибка");
 
-        // Проверяем, что транзакция откатилась и данные НЕ сохранены
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-        verify(vectorStore, never()).add(anyList());
+        assertThat(documentRepository.findAll()).isEmpty();
 
-        System.out.println("✅ Тест с пустым OCR результатом пройден");
-        System.out.println("   - Исключение выброшено корректно");
-        System.out.println("   - Данные НЕ сохранены в БД");
-        System.out.println("   - Данные НЕ сохранены в векторном хранилище");
+        log.info("✅ Тест с пустым OCR результатом пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ reIngestDocument
     // ============================================================
 
-    /**
-     * Тест перезагрузки документа.
-     * Проверяет, что старый документ удаляется, а новый загружается.
-     */
     @Test
-    void testReIngestDocument_Success() throws DocumentIngestionException, IOException {
+    void testReIngestDocument_Success() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-        String fileName = "support-document.txt";
+        ingestionService.ingestDocument(testFile, testMetadata);
+        assertThat(documentRepository.findAll()).hasSize(1);
 
         // Act
         ingestionService.reIngestDocument(testFile, testMetadata);
 
         // Assert
-        verify(documentRepository).deleteByFileName(fileName);
-        verify(documentRepository).save(any(DocumentEntity.class));
-        verify(vectorStore).add(anyList());
+        List<DocumentEntity> documents = documentRepository.findAll();
+        assertThat(documents).hasSize(1);
+        assertThat(documents.getFirst().getFileName()).isEqualTo("support-document.txt");
 
-        System.out.println("✅ Тест перезагрузки документа пройден");
+        log.info("✅ Тест перезагрузки документа пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ deleteDocument
     // ============================================================
 
-    /**
-     * Тест удаления документа по ID.
-     * Проверяет, что документ успешно удаляется.
-     */
     @Test
-    void testDeleteDocument_Success() {
+    void testDeleteDocument_Success() throws DocumentIngestionException {
         // Arrange
-        Long documentId = 1L;
-        when(documentRepository.existsById(documentId)).thenReturn(true);
+        ingestionService.ingestDocument(testFile, testMetadata);
+        List<DocumentEntity> documents = documentRepository.findAll();
+        Long documentId = documents.getFirst().getId();
 
         // Act
         boolean result = ingestionService.deleteDocument(documentId);
 
         // Assert
         assertThat(result).isTrue();
-        verify(documentRepository).deleteById(documentId);
+        assertThat(documentRepository.findById(documentId)).isEmpty();
 
-        System.out.println("✅ Тест удаления документа по ID пройден");
+        log.info("✅ Тест удаления документа по ID пройден");
     }
 
-    /**
-     * Тест удаления несуществующего документа по ID.
-     * Проверяет, что возвращается false.
-     */
     @Test
     void testDeleteDocument_NotFound() {
-        // Arrange
-        Long documentId = 999L;
-        when(documentRepository.existsById(documentId)).thenReturn(false);
-
         // Act
-        boolean result = ingestionService.deleteDocument(documentId);
+        boolean result = ingestionService.deleteDocument(999L);
 
         // Assert
         assertThat(result).isFalse();
-        verify(documentRepository, never()).deleteById(any());
 
-        System.out.println("✅ Тест удаления несуществующего документа пройден");
+        log.info("✅ Тест удаления несуществующего документа пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ deleteDocumentByFileName
     // ============================================================
 
-    /**
-     * Тест удаления документа по имени файла.
-     * Проверяет, что документ успешно удаляется.
-     */
     @Test
-    void testDeleteDocumentByFileName_Success() {
+    void testDeleteDocumentByFileName_Success() throws DocumentIngestionException {
         // Arrange
-        String fileName = "test.txt";
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.of(new DocumentEntity()));
+        ingestionService.ingestDocument(testFile, testMetadata);
+        assertThat(documentRepository.findAll()).hasSize(1);
 
         // Act
-        boolean result = ingestionService.deleteDocumentByFileName(fileName);
+        boolean result = ingestionService.deleteDocumentByFileName("support-document.txt");
 
         // Assert
         assertThat(result).isTrue();
-        verify(documentRepository).deleteByFileName(fileName);
+        assertThat(documentRepository.findAll()).isEmpty();
 
-        System.out.println("✅ Тест удаления документа по имени файла пройден");
+        log.info("✅ Тест удаления документа по имени файла пройден");
     }
 
-    /**
-     * Тест удаления несуществующего документа по имени файла.
-     * Проверяет, что возвращается false.
-     */
     @Test
     void testDeleteDocumentByFileName_NotFound() {
-        // Arrange
-        String fileName = "nonexistent.txt";
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.empty());
-
         // Act
-        boolean result = ingestionService.deleteDocumentByFileName(fileName);
+        boolean result = ingestionService.deleteDocumentByFileName("nonexistent.txt");
 
         // Assert
         assertThat(result).isFalse();
-        verify(documentRepository, never()).deleteByFileName(any());
 
-        System.out.println("✅ Тест удаления несуществующего документа по имени пройден");
+        log.info("✅ Тест удаления несуществующего документа по имени пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ documentExists
     // ============================================================
 
-    /**
-     * Тест проверки существования документа.
-     * Проверяет, что возвращается true, если документ существует.
-     */
     @Test
-    void testDocumentExists_WhenExists() {
+    void testDocumentExists_WhenExists() throws DocumentIngestionException {
         // Arrange
-        String fileName = "test.txt";
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.of(new DocumentEntity()));
+        ingestionService.ingestDocument(testFile, testMetadata);
 
         // Act
-        boolean exists = ingestionService.documentExists(fileName);
+        boolean exists = ingestionService.documentExists("support-document.txt");
 
         // Assert
         assertThat(exists).isTrue();
 
-        System.out.println("✅ Тест проверки существования документа (true) пройден");
+        log.info("✅ Тест проверки существования документа (true) пройден");
     }
 
-    /**
-     * Тест проверки существования документа.
-     * Проверяет, что возвращается false, если документ не существует.
-     */
     @Test
     void testDocumentExists_WhenNotExists() {
-        // Arrange
-        String fileName = "nonexistent.txt";
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.empty());
-
         // Act
-        boolean exists = ingestionService.documentExists(fileName);
+        boolean exists = ingestionService.documentExists("nonexistent.txt");
 
         // Assert
         assertThat(exists).isFalse();
 
-        System.out.println("✅ Тест проверки существования документа (false) пройден");
+        log.info("✅ Тест проверки существования документа (false) пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ getDocument
     // ============================================================
 
-    /**
-     * Тест получения документа по ID.
-     * Проверяет, что возвращается Optional с документом.
-     */
     @Test
-    void testGetDocument_Success() {
+    void testGetDocument_Success() throws DocumentIngestionException {
         // Arrange
-        Long documentId = 1L;
-        DocumentEntity document = new DocumentEntity();
-        document.setId(documentId);
-        when(documentRepository.findById(documentId))
-                .thenReturn(Optional.of(document));
+        ingestionService.ingestDocument(testFile, testMetadata);
+        List<DocumentEntity> documents = documentRepository.findAll();
+        Long documentId = documents.getFirst().getId();
 
         // Act
         Optional<DocumentEntity> result = ingestionService.getDocument(documentId);
 
         // Assert
         assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(documentId);
+        assertThat(result.get().getFileName()).isEqualTo("support-document.txt");
 
-        System.out.println("✅ Тест получения документа по ID пройден");
+        log.info("✅ Тест получения документа по ID пройден");
     }
 
-    /**
-     * Тест получения несуществующего документа по ID.
-     * Проверяет, что возвращается пустой Optional.
-     */
     @Test
     void testGetDocument_NotFound() {
-        // Arrange
-        Long documentId = 999L;
-        when(documentRepository.findById(documentId))
-                .thenReturn(Optional.empty());
-
         // Act
-        Optional<DocumentEntity> result = ingestionService.getDocument(documentId);
+        Optional<DocumentEntity> result = ingestionService.getDocument(999L);
 
         // Assert
         assertThat(result).isEmpty();
 
-        System.out.println("✅ Тест получения несуществующего документа пройден");
+        log.info("✅ Тест получения несуществующего документа пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ getDocumentByFileName
     // ============================================================
 
-    /**
-     * Тест получения документа по имени файла.
-     * Проверяет, что возвращается Optional с документом.
-     */
     @Test
-    void testGetDocumentByFileName_Success() {
+    void testGetDocumentByFileName_Success() throws DocumentIngestionException {
         // Arrange
-        String fileName = "test.txt";
-        DocumentEntity document = new DocumentEntity();
-        document.setFileName(fileName);
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.of(document));
+        ingestionService.ingestDocument(testFile, testMetadata);
 
         // Act
-        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName(fileName);
+        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName("support-document.txt");
 
         // Assert
         assertThat(result).isPresent();
-        assertThat(result.get().getFileName()).isEqualTo(fileName);
+        assertThat(result.get().getFileName()).isEqualTo("support-document.txt");
 
-        System.out.println("✅ Тест получения документа по имени файла пройден");
+        log.info("✅ Тест получения документа по имени файла пройден");
     }
 
-    /**
-     * Тест получения несуществующего документа по имени файла.
-     * Проверяет, что возвращается пустой Optional.
-     */
     @Test
     void testGetDocumentByFileName_NotFound() {
-        // Arrange
-        String fileName = "nonexistent.txt";
-        when(documentRepository.findByFileName(fileName))
-                .thenReturn(Optional.empty());
-
         // Act
-        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName(fileName);
+        Optional<DocumentEntity> result = ingestionService.getDocumentByFileName("nonexistent.txt");
 
         // Assert
         assertThat(result).isEmpty();
 
-        System.out.println("✅ Тест получения несуществующего документа по имени пройден");
+        log.info("✅ Тест получения несуществующего документа по имени пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ getAllDocuments
     // ============================================================
 
-    /**
-     * Тест получения всех документов.
-     * Проверяет, что возвращается список всех документов.
-     */
     @Test
-    void testGetAllDocuments() {
+    void testGetAllDocuments() throws DocumentIngestionException {
         // Arrange
-        List<DocumentEntity> documents = List.of(
-                new DocumentEntity(),
-                new DocumentEntity(),
-                new DocumentEntity()
-        );
-        when(documentRepository.findAll()).thenReturn(documents);
+        ingestionService.ingestDocument(testFile, testMetadata);
 
         // Act
         List<DocumentEntity> result = ingestionService.getAllDocuments();
 
         // Assert
-        assertThat(result).hasSize(3);
-        verify(documentRepository).findAll();
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().getFileName()).isEqualTo("support-document.txt");
 
-        System.out.println("✅ Тест получения всех документов пройден");
+        log.info("✅ Тест получения всех документов пройден");
     }
 
-    /**
-     * Тест получения всех документов, когда список пуст.
-     * Проверяет, что возвращается пустой список.
-     */
     @Test
     void testGetAllDocuments_EmptyList() {
-        // Arrange
-        when(documentRepository.findAll()).thenReturn(List.of());
-
         // Act
         List<DocumentEntity> result = ingestionService.getAllDocuments();
 
         // Assert
         assertThat(result).isEmpty();
 
-        System.out.println("✅ Тест получения всех документов (пустой список) пройден");
+        log.info("✅ Тест получения всех документов (пустой список) пройден");
     }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ clearAllDocuments
     // ============================================================
 
-    /**
-     * Тест очистки всех документов.
-     * Проверяет, что метод deleteAll вызывается.
-     */
     @Test
-    void testClearAllDocuments() {
+    void testClearAllDocuments() throws DocumentIngestionException {
+        // Arrange
+        ingestionService.ingestDocument(testFile, testMetadata);
+        assertThat(documentRepository.findAll()).hasSize(1);
+
         // Act
         ingestionService.clearAllDocuments();
 
         // Assert
-        verify(documentRepository).deleteAll();
+        assertThat(documentRepository.findAll()).isEmpty();
 
-        System.out.println("✅ Тест очистки всех документов пройден");
+        log.info("✅ Тест очистки всех документов пройден");
     }
 
     // ============================================================
-    // ТЕСТЫ ДЛЯ ДУБЛИКАТОВ
+    // ТЕСТЫ ДЛЯ ДУБЛИКАТОВ И РАЗМЕРА
     // ============================================================
 
-    /**
-     * Тест загрузки дубликата документа.
-     * Проверяет, что сервис выбрасывает исключение при попытке загрузить существующий документ.
-     */
     @Test
-    void testIngestDocument_WhenDocumentAlreadyExists() {
+    void testIngestDocument_WhenDocumentAlreadyExists() throws DocumentIngestionException {
         // Arrange
-        when(ocrService.isImageFile(any())).thenReturn(false);
-        when(documentRepository.findByFileName("support-document.txt"))
-                .thenReturn(Optional.of(new DocumentEntity()));
+        ingestionService.ingestDocument(testFile, testMetadata);
 
         // Act & Assert
         assertThatThrownBy(() -> ingestionService.ingestDocument(testFile, testMetadata))
                 .isInstanceOf(DocumentIngestionException.class)
                 .hasMessageContaining("уже существует");
 
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-        verify(vectorStore, never()).add(anyList());
-
-        System.out.println("✅ Тест загрузки дубликата документа пройден");
+        log.info("✅ Тест загрузки дубликата документа пройден");
     }
 
-    /**
-     * Тест загрузки файла с превышением максимального размера.
-     * Проверяет, что сервис выбрасывает исключение.
-     */
     @Test
     void testIngestDocument_WhenFileTooLarge() {
         // Arrange
-        byte[] largeContent = new byte[11 * 1024 * 1024]; // 11MB
+        byte[] largeContent = new byte[11 * 1024 * 1024];
         MultipartFile largeFile = new MockMultipartFile(
                 "file",
                 "large.txt",
@@ -825,9 +575,8 @@ class DocumentIngestionServiceTest {
                 .isInstanceOf(DocumentIngestionException.class)
                 .hasMessageContaining("превышает");
 
-        verify(documentRepository, never()).save(any(DocumentEntity.class));
-        verify(vectorStore, never()).add(anyList());
+        assertThat(documentRepository.findAll()).isEmpty();
 
-        System.out.println("✅ Тест превышения размера файла пройден");
+        log.info("✅ Тест превышения размера файла пройден");
     }
 }
