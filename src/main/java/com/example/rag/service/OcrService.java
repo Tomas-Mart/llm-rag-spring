@@ -74,6 +74,11 @@ public class OcrService {
      * @throws IOException если ошибка при обработке файла или распознавании
      */
     public String extractText(MultipartFile file) throws IOException {
+
+        if (file == null || file.isEmpty()) {
+            throw new IOException("Файл пуст или отсутствует");
+        }
+
         try (InputStream inputStream = file.getInputStream()) {
             log.info("🔍 Распознавание текста из изображения: {}", file.getOriginalFilename());
 
@@ -113,10 +118,17 @@ public class OcrService {
      * @return true если файл является поддерживаемым изображением
      */
     public boolean isImageFile(MultipartFile file) {
-        String fileName = file.getOriginalFilename();
-        if (fileName == null) {
+
+        if (file == null) {
             return false;
         }
+
+        String fileName = file.getOriginalFilename();
+
+        if (fileName == null || fileName.isEmpty()) {
+            return false;
+        }
+
         String lowerName = fileName.toLowerCase();
 
         // Проверка по расширению

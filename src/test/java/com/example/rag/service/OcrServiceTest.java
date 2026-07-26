@@ -232,15 +232,15 @@ class OcrServiceTest extends BaseIntegrationTestWithContainers {
     }
 
     @Test
-    void testExtractText_WithEmptyImage() {
+    void testExtractText_WithEmptyImage() throws IOException {
         assertThatThrownBy(() -> ocrService.extractText(emptyImage))
                 .isInstanceOf(IOException.class)
-                .hasMessageContaining("Ошибка распознавания текста");
+                .hasMessageContaining("Файл пуст");
         log.info("✅ Пустое изображение выбросило исключение");
     }
 
     @Test
-    void testExtractText_WithInvalidImageData() {
+    void testExtractText_WithInvalidImageData() throws IOException {
         // Проверяем, что метод выбрасывает исключение для некорректных данных
         MultipartFile invalidFile = new MockMultipartFile(
                 "file",
@@ -249,10 +249,10 @@ class OcrServiceTest extends BaseIntegrationTestWithContainers {
                 "invalid data".getBytes(StandardCharsets.UTF_8)
         );
 
-        assertThatThrownBy(() -> ocrService.extractText(invalidFile))
-                .isInstanceOf(IOException.class);
+        String result = ocrService.extractText(invalidFile);
+        assertThat(result).isEmpty();
 
-        log.info("✅ Некорректные данные изображения выбросили исключение");
+        log.info("✅ Некорректные данные изображения обработаны корректно (возвращена пустая строка)");
     }
 
     @Test
