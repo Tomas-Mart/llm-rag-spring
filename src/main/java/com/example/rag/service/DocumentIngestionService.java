@@ -43,7 +43,7 @@ public class DocumentIngestionService {
     /**
      * Максимальный размер файла для загрузки (10 МБ).
      */
-    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
 
     /**
      * Размер пакета для сохранения чанков в векторное хранилище.
