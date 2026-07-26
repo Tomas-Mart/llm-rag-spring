@@ -308,7 +308,7 @@ jobs:
         run: |
           mvn deploy -DskipTests -B \
             -Dgithub.token=$DEPLOY_TOKEN \
-            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/Tomas-Mart/llm-rag-spring
+            -DaltDeploymentRepository=github::https://maven.pkg.github.com/Tomas-Mart/llm-rag-spring
 
       - name: Login to GHCR
         uses: docker/login-action@v3
