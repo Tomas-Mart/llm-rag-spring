@@ -4,6 +4,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -21,47 +22,35 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
- * Абстрактный базовый класс для всех интеграционных тестов приложения.
- * Использует реальную PostgreSQL с pgvector из конфигурации.
- *
- * <h2>Основные возможности</h2>
+ * Базовый класс для ИНТЕГРАЦИОННЫХ тестов с ВНЕШНЕЙ PostgreSQL.
+ * <p>
+ * Особенности:
  * <ul>
- *   <li>Загрузка Spring контекста с профилем {@code integration-test}</li>
- *   <li>Моки для Ollama API и Chat Model</li>
- *   <li>Реальный VectorStore для проверки эмбеддингов</li>
- *   <li>Flyway для управления схемой базы данных</li>
+ *   <li>Использует существующий контейнер PostgreSQL (не Testcontainers)</li>
+ *   <li>Требует запущенной базы данных на порту 32769</li>
+ *   <li>Использует Flyway для управления схемой</li>
+ *   <li>Автоматический откат транзакций</li>
  * </ul>
  *
- * <h2>Важно</h2>
- * <p>В этом классе НЕТ H2 и Testcontainers. Используется существующий контейнер PostgreSQL.</p>
- *
- * <h2>Пример использования</h2>
+ * <h2>Использование</h2>
  * <pre>{@code
- * @SpringBootTest
- * @ActiveProfiles("integration-test")
- * class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTest {
- *
- *     @Autowired
- *     private DocumentIngestionService ingestionService;
- *
+ * @Slf4j
+ * class FlywayIT extends BaseIntegrationTest {
  *     @Test
- *     void testIngestDocument() throws Exception {
- *         ingestionService.ingestDocument(file, "test");
- *         var saved = documentRepository.findAll();
- *         assertThat(saved).isNotEmpty();
+ *     void testMigrations() throws SQLException {
+ *         assertFlywayMigrationsApplied();
  *     }
  * }
  * }</pre>
  *
  * @author RAG Application Team
  * @version 6.0
- * @see BaseTest
- * @see BaseIntegrationTestWithContainers
  * @since 1.0
  */
 @Slf4j
 @Transactional
 @Tag("integration")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ActiveProfiles("integration-test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class BaseIntegrationTest {
@@ -92,7 +81,7 @@ public abstract class BaseIntegrationTest {
     protected DataSource dataSource;
 
     // ============================================================
-    // SQL КОНСТАНТЫ (Java 21 text blocks)
+    // SQL КОНСТАНТЫ
     // ============================================================
 
     private static final String CHECK_EXTENSION_SQL = """
@@ -160,143 +149,86 @@ public abstract class BaseIntegrationTest {
     }
 
     // ============================================================
-    // ПРОВЕРКИ КОМПОНЕНТОВ
+    // ПРОВЕРКИ
     // ============================================================
 
     protected void assertMocksCreated() {
-        assertThat(ollamaApi)
-                .as("OllamaApi mock should be created")
-                .isNotNull();
-
-        assertThat(ollamaChatModel)
-                .as("OllamaChatModel mock should be created")
-                .isNotNull();
-
-        log.info("✅ All mocks created successfully");
-        log.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
-        log.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
+        assertThat(ollamaApi).isNotNull();
+        assertThat(ollamaChatModel).isNotNull();
+        log.info("✅ All mocks created");
     }
 
     protected void assertApplicationContextLoaded() {
-        assertThat(application)
-                .as("Application bean should be loaded")
-                .isNotNull();
-
-        assertThat(applicationContext)
-                .as("ApplicationContext should be loaded")
-                .isNotNull();
-
-        log.info("✅ Application context loaded successfully");
-        log.debug("   - Bean count: {}", applicationContext.getBeanDefinitionCount());
-        log.debug("   - Application name: {}", applicationContext.getApplicationName());
+        assertThat(application).isNotNull();
+        assertThat(applicationContext).isNotNull();
+        log.info("✅ Context loaded, beans: {}", applicationContext.getBeanDefinitionCount());
     }
 
     protected void assertVectorStoreAvailable() {
-        assertThat(vectorStore)
-                .as("VectorStore should be available for integration tests")
-                .isNotNull();
-
-        log.info("✅ VectorStore is available");
-        log.debug("   - VectorStore type: {}", vectorStore.getClass().getSimpleName());
+        assertThat(vectorStore).isNotNull();
+        log.info("✅ VectorStore available: {}", vectorStore.getClass().getSimpleName());
     }
 
     protected void assertDataSourceAvailable() throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available")
-                .isNotNull();
+        assertThat(dataSource).isNotNull();
 
         try (var connection = dataSource.getConnection()) {
-            assertThat(connection)
-                    .as("Database connection should be established")
-                    .isNotNull();
-            assertThat(connection.isValid(5))
-                    .as("Connection should be valid")
-                    .isTrue();
-
+            assertThat(connection.isValid(5)).isTrue();
             var metaData = connection.getMetaData();
-            log.info("✅ Database connection established successfully");
+            log.info("✅ Database connected");
             log.debug("   📍 URL: {}", metaData.getURL());
             log.debug("   🗄️  Product: {}", metaData.getDatabaseProductName());
             log.debug("   📦 Version: {}", metaData.getDatabaseProductVersion());
-        } catch (SQLException e) {
-            log.error("❌ Failed to connect to database", e);
-            throw e;
         }
     }
 
     protected void assertPgvectorAvailable() throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available for pgvector check")
-                .isNotNull();
+        assertThat(dataSource).isNotNull();
 
         try (var conn = dataSource.getConnection();
              var stmt = conn.createStatement()) {
 
-            // 1. Проверяем установку расширения pgvector
             try (var rs = stmt.executeQuery(CHECK_EXTENSION_SQL)) {
-                boolean hasExtension = rs.next();
-                assertThat(hasExtension)
-                        .as("pgvector extension should be installed")
-                        .isTrue();
-                log.info("✅ pgvector extension is installed");
+                assertThat(rs.next()).isTrue();
+                log.info("✅ pgvector extension installed");
             }
 
-            // 2. Проверяем существование таблицы vector_store
             try (var rs = stmt.executeQuery(CHECK_VECTOR_STORE_TABLE_SQL)) {
                 rs.next();
-                boolean tableExists = rs.getBoolean(1);
-                assertThat(tableExists)
-                        .as("vector_store table should exist")
-                        .isTrue();
+                assertThat(rs.getBoolean(1)).isTrue();
                 log.info("✅ vector_store table exists");
             }
 
-            // 3. Проверяем тип vector
             try (var rs = stmt.executeQuery(CHECK_VECTOR_TYPE_SQL)) {
                 rs.next();
-                boolean vectorTypeExists = rs.getBoolean(1);
-                assertThat(vectorTypeExists)
-                        .as("vector type should exist")
-                        .isTrue();
+                assertThat(rs.getBoolean(1)).isTrue();
                 log.info("✅ vector type exists");
             }
 
-            // 4. Тестируем создание вектора
             try (var rs = stmt.executeQuery(TEST_VECTOR_SQL)) {
                 rs.next();
                 var vector = rs.getString(1);
-                assertThat(vector)
-                        .as("Vector type should work")
-                        .contains("1", "2", "3");
-                log.info("✅ vector type is working: {}", vector);
+                assertThat(vector).contains("1", "2", "3");
+                log.info("✅ vector type working: {}", vector);
             }
-
-        } catch (SQLException e) {
-            log.error("❌ pgvector validation failed", e);
-            throw e;
         }
     }
 
     protected void assertFlywayMigrationsApplied() throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available for Flyway check")
-                .isNotNull();
+        assertThat(dataSource).isNotNull();
 
         try (var conn = dataSource.getConnection();
              var stmt = conn.createStatement();
              var rs = stmt.executeQuery(CHECK_FLYWAY_SQL)) {
 
             if (rs.next()) {
-                log.info("✅ Flyway migrations applied successfully");
-                log.debug("   📌 Latest version: {}", rs.getString("version"));
+                log.info("✅ Flyway migrations applied");
+                log.debug("   📌 Version: {}", rs.getString("version"));
                 log.debug("   📝 Description: {}", rs.getString("description"));
                 log.debug("   ✅ Success: {}", rs.getBoolean("success"));
             } else {
                 log.warn("⚠️ No Flyway migrations found");
             }
-        } catch (SQLException e) {
-            log.error("❌ Flyway check failed", e);
-            throw e;
         }
     }
 
@@ -307,7 +239,7 @@ public abstract class BaseIntegrationTest {
         assertDataSourceAvailable();
         assertPgvectorAvailable();
         assertFlywayMigrationsApplied();
-        log.info("✅ All components loaded successfully for integration tests");
+        log.info("✅ All components loaded");
     }
 
     // ============================================================
@@ -335,57 +267,34 @@ public abstract class BaseIntegrationTest {
     }
 
     protected void assertDoesNotThrow(Runnable code, String message) {
-        assertThatCode(code::run)
-                .as(message)
-                .doesNotThrowAnyException();
+        assertThatCode(code::run).as(message).doesNotThrowAnyException();
     }
 
     protected void cleanDatabase() throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available for cleanup")
-                .isNotNull();
-
         try (var conn = dataSource.getConnection();
              var stmt = conn.createStatement()) {
             stmt.execute(TRUNCATE_VECTOR_STORE_SQL);
             stmt.execute(TRUNCATE_DOCUMENT_SQL);
-            log.info("🧹 Database cleaned up successfully");
-        } catch (SQLException e) {
-            log.error("❌ Failed to clean database", e);
-            throw e;
+            log.info("🧹 Database cleaned");
         }
     }
 
     protected void assertVectorCount(long expectedCount) throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available for count check")
-                .isNotNull();
-
         try (var conn = dataSource.getConnection();
              var stmt = conn.createStatement();
              var rs = stmt.executeQuery(COUNT_VECTORS_SQL)) {
             rs.next();
-            long actualCount = rs.getLong(1);
-            assertThat(actualCount)
-                    .as("Vector store should contain %d records", expectedCount)
-                    .isEqualTo(expectedCount);
-            log.info("✅ Vector store contains {} records", actualCount);
+            assertThat(rs.getLong(1)).isEqualTo(expectedCount);
+            log.info("✅ Vector count: {}", expectedCount);
         }
     }
 
     protected void assertDocumentTableExists() throws SQLException {
-        assertThat(dataSource)
-                .as("DataSource should be available for table check")
-                .isNotNull();
-
         try (var conn = dataSource.getConnection();
              var stmt = conn.createStatement();
              var rs = stmt.executeQuery(CHECK_DOCUMENTS_TABLE_SQL)) {
             rs.next();
-            boolean tableExists = rs.getBoolean(1);
-            assertThat(tableExists)
-                    .as("documents table should exist")
-                    .isTrue();
+            assertThat(rs.getBoolean(1)).isTrue();
             log.info("✅ documents table exists");
         }
     }

@@ -146,8 +146,8 @@ class DocumentEntityTest {
 
         DocumentEntity entity = new DocumentEntity(
                 TEST_ID,
-                TEST_CONTENT,
                 TEST_FILE_NAME,
+                TEST_CONTENT,
                 TEST_METADATA,
                 now
         );
@@ -156,8 +156,8 @@ class DocumentEntityTest {
                 .as("Entity should be created with all-args constructor")
                 .satisfies(e -> {
                     assertThat(e.getId()).isEqualTo(TEST_ID);
-                    assertThat(e.getContent()).isEqualTo(TEST_CONTENT);
                     assertThat(e.getFileName()).isEqualTo(TEST_FILE_NAME);
+                    assertThat(e.getContent()).isEqualTo(TEST_CONTENT);
                     assertThat(e.getMetadata()).isEqualTo(TEST_METADATA);
                     assertThat(e.getCreatedAt()).isEqualTo(now);
                 });

@@ -1,6 +1,8 @@
-gsversion: 2
+version: 2
 updates:
-  # Maven зависимости
+  # ============================================
+  # MAVEN DEPENDENCIES
+  # ============================================
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
@@ -8,26 +10,67 @@ updates:
       day: "monday"
       time: "08:00"
       timezone: "Europe/Moscow"
+    target-branch: "develop"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "security"
+      - "java"
     commit-message:
       prefix: "chore(deps)"
     reviewers:
       - "Tomas-Mart"
+    assignees:
+      - "Tomas-Mart"
+    # Группировка для уменьшения PR
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot*"
+          - "org.springframework*"
+        update-types:
+          - "minor"
+          - "patch"
+      ai-dependencies:
+        patterns:
+          - "org.springframework.ai*"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "org.springframework.boot"
-        versions: [ "< 3.3.5" ]
+        versions: [ ">=4.0.0" ]
+      - dependency-name: "org.springframework.ai"
+        versions: [ ">=2.0.0" ]
 
-  # GitHub Actions зависимости
+  # ============================================
+  # GITHUB ACTIONS DEPENDENCIES
+  # ============================================
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "08:00"
+      timezone: "Europe/Moscow"
     labels:
       - "dependencies"
       - "ci"
     commit-message:
       prefix: "chore(ci)"
+    reviewers:
+      - "Tomas-Mart"
+
+  # ============================================
+  # DOCKER DEPENDENCIES (опционально)
+  # ============================================
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: [ "version-update:semver-major" ]

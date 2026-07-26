@@ -1,9 +1,9 @@
 package com.example.rag.support;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.ollama.OllamaChatModel;
@@ -15,58 +15,65 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import com.example.rag.Application;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Базовый класс для модульных тестов.
- *
- * <h2>Основные возможности</h2>
+ * Базовый класс для МОДУЛЬНЫХ тестов.
+ * <p>
+ * Особенности:
  * <ul>
- *   <li>Загрузка Spring контекста с профилем {@code test}</li>
- *   <li>Моки для всех внешних зависимостей</li>
- *   <li>Подключение к существующему контейнеру PostgreSQL</li>
- *   <li>Быстрое выполнение благодаря мокам</li>
+ *   <li>Использует {@code @SpringBootTest} с MOCK окружением</li>
+ *   <li>Все внешние зависимости заменены на моки</li>
+ *   <li>Использует H2 in-memory базу данных для быстрых тестов</li>
+ *   <li>AI компоненты ОТКЛЮЧЕНЫ</li>
+ *   <li><b>ИСКЛЮЧЕНА автоконфигурация VectorStore (не пытается создать EXTENSION)</b></li>
+ *   <li>Быстрое выполнение (секунды)</li>
  * </ul>
  *
- * <h2>Моки для внешних зависимостей</h2>
+ * <h2>Ключевые настройки</h2>
  * <ul>
- *   <li>{@link OllamaApi} - клиент для Ollama API</li>
- *   <li>{@link OllamaChatModel} - модель чата</li>
- *   <li>{@link VectorStore} - векторное хранилище</li>
- *   <li>{@link ChatClient} - клиент для работы с чатом</li>
- *   <li>{@link EmbeddingModel} - модель эмбеддингов</li>
+ *   <li>{@code spring.ai.ollama.enabled=false} - отключает Ollama</li>
+ *   <li>{@code spring.ai.vectorstore.enabled=false} - отключает VectorStore</li>
+ *   <li>{@code spring.autoconfigure.exclude=...PgVectorStoreAutoConfiguration} - исключает автоконфигурацию</li>
+ *   <li>H2 in-memory для тестовой базы данных</li>
+ *   <li>Все бины заменены на моки через {@code @MockBean}</li>
  * </ul>
- *
- * <h2>Пример использования</h2>
- * <pre>{@code
- * @SpringBootTest
- * @ActiveProfiles("test")
- * @Slf4j
- * class MyServiceTest extends BaseTest {
- *
- *     @Autowired
- *     private MyService myService;
- *
- *     @Test
- *     void testServiceMethod() {
- *         when(vectorStore.similaritySearch(any())).thenReturn(List.of(...));
- *         String result = myService.process();
- *         assertThat(result).isNotNull();
- *         log.info("✅ Test passed");
- *     }
- * }
- * }</pre>
  *
  * @author RAG Application Team
- * @version 5.0
+ * @version 4.2
  * @since 1.0
  */
 @Slf4j
-@SpringBootTest
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+        classes = Application.class,
+        properties = {
+                // Отключаем AI компоненты для модульных тестов
+                "spring.ai.ollama.enabled=false",
+                "spring.ai.vectorstore.enabled=false",
+                // Отключаем Flyway и SQL инициализацию
+                "spring.flyway.enabled=false",
+                "spring.sql.init.enabled=false",
+                // JPA настройки
+                "spring.jpa.hibernate.ddl-auto=create-drop",
+                // ⭐ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: исключаем автоконфигурацию VectorStore
+                "spring.autoconfigure.exclude=org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration"
+        }
+)
 @ActiveProfiles("test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestPropertySource(properties = {
+        // H2 in-memory для модульных тестов
+        "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect"
+})
 public abstract class BaseTest {
 
     // ============================================================
@@ -112,7 +119,6 @@ public abstract class BaseTest {
     void setUpBase() {
         log.info("🚀 Running test: {}", getTestName());
         log.debug("📋 Class: {}", getClass().getName());
-        log.debug("🐘 PostgreSQL: {}", environment.getProperty("spring.datasource.url"));
         log.debug("📊 Profiles: {}", String.join(", ", environment.getActiveProfiles()));
         assertAllBeansLoaded();
     }
@@ -122,27 +128,56 @@ public abstract class BaseTest {
     // ============================================================
 
     protected void assertMocksCreated() {
-        assertThat(ollamaApi).isNotNull();
-        assertThat(ollamaChatModel).isNotNull();
-        assertThat(vectorStore).isNotNull();
-        assertThat(chatClient).isNotNull();
-        assertThat(embeddingModel).isNotNull();
+        assertThat(ollamaApi)
+                .as("OllamaApi mock should be created")
+                .isNotNull();
+
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel mock should be created")
+                .isNotNull();
+
+        assertThat(vectorStore)
+                .as("VectorStore mock should be created")
+                .isNotNull();
+
+        assertThat(chatClient)
+                .as("ChatClient mock should be created")
+                .isNotNull();
+
+        assertThat(embeddingModel)
+                .as("EmbeddingModel mock should be created")
+                .isNotNull();
+
         log.info("✅ All mocks created");
     }
 
     protected void assertApplicationContextLoaded() {
-        assertThat(application).isNotNull();
-        assertThat(applicationContext).isNotNull();
+        assertThat(application)
+                .as("Application bean should be loaded")
+                .isNotNull();
+
+        assertThat(applicationContext)
+                .as("ApplicationContext should be loaded")
+                .isNotNull();
+
         log.info("✅ Context loaded, beans: {}", applicationContext.getBeanDefinitionCount());
     }
 
     protected void assertDataSourceAvailable() throws SQLException {
         if (dataSource == null) {
-            log.warn("⚠️ DataSource not available");
+            log.warn("⚠️ DataSource not available (optional bean)");
             return;
         }
-        try (Connection conn = dataSource.getConnection()) {
-            assertThat(conn.isValid(5)).isTrue();
+
+        try (var connection = dataSource.getConnection()) {
+            assertThat(connection.isValid(5))
+                    .as("Connection should be valid")
+                    .isTrue();
+
+            var metaData = connection.getMetaData();
+            log.debug("   📍 URL: {}", metaData.getURL());
+            log.debug("   🗄️  Product: {}", metaData.getDatabaseProductName());
+            log.debug("   📦 Version: {}", metaData.getDatabaseProductVersion());
             log.info("✅ Database connected");
         }
     }

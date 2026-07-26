@@ -1,17 +1,14 @@
 package com.example.rag.controller;
 
 import java.nio.charset.StandardCharsets;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import com.example.rag.controller.web.DocumentController;
 import com.example.rag.exception.DocumentIngestionException;
 import com.example.rag.service.DocumentIngestionService;
 import io.qameta.allure.Description;
@@ -36,29 +33,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Модульный тест для проверки работы {@link DocumentController}.
- *
- * <h2>Назначение</h2>
- * <p>Проверяет загрузку документов через REST API, валидацию и обработку ошибок.</p>
- *
- * <h2>Тестируемые сценарии</h2>
- * <ul>
- *   <li>Загрузка документа с метаданными</li>
- *   <li>Загрузка документа без метаданных</li>
- *   <li>Загрузка пустого файла (валидация)</li>
- *   <li>Загрузка файла больше 10MB (валидация)</li>
- *   <li>Обработка DocumentIngestionException</li>
- *   <li>Обработка общих исключений</li>
- *   <li>Принудительная перезагрузка документа (force)</li>
- * </ul>
+ * <p>
+ * Использует {@link WebMvcTest} для загрузки только web-слоя.
+ * {@link DocumentIngestionService} замокан через {@link MockBean}.
  *
  * @author RAG Application Team
- * @version 5.0
+ * @version 6.0
  * @see DocumentController
- * @see DocumentIngestionService
  * @since 1.0
  */
 @Slf4j
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(DocumentController.class)
 @Epic("Модульные тесты")
 @Feature("Контроллер документов")
 class DocumentControllerTest {
@@ -77,28 +62,14 @@ class DocumentControllerTest {
     private static final String DEFAULT_METADATA = "support-metadata";
 
     // ============================================================
-    // МОКИ
+    // ЗАВИСИМОСТИ
     // ============================================================
 
-    @Mock
-    private DocumentIngestionService ingestionService;
-
-    @InjectMocks
-    private DocumentController documentController;
-
+    @Autowired
     private MockMvc mockMvc;
 
-    // ============================================================
-    // ИНИЦИАЛИЗАЦИЯ
-    // ============================================================
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(documentController)
-                .setMessageConverters(new StringHttpMessageConverter(StandardCharsets.UTF_8))
-                .build();
-        log.info("✅ DocumentControllerTest initialized");
-    }
+    @MockBean
+    private DocumentIngestionService ingestionService;
 
     // ============================================================
     // ТЕСТЫ
@@ -109,11 +80,8 @@ class DocumentControllerTest {
     @Story("Загрузка документов")
     @Severity(SeverityLevel.CRITICAL)
     void testUploadDocument() throws Exception {
-        logTestStart("Testing document upload with metadata");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // Настраиваем мок - документ не существует
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(false);
 
         mockMvc.perform(multipart(UPLOAD_URL)
@@ -124,8 +92,6 @@ class DocumentControllerTest {
                 .andExpect(flash().attributeExists("message"));
 
         verify(ingestionService).ingestDocument(any(), anyString());
-
-        logTestSuccess("Document upload with metadata completed");
     }
 
     @Test
@@ -133,11 +99,8 @@ class DocumentControllerTest {
     @Story("Загрузка документов")
     @Severity(SeverityLevel.NORMAL)
     void testUploadDocumentWithoutMetadata() throws Exception {
-        logTestStart("Testing document upload without metadata");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // Настраиваем мок - документ не существует
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(false);
 
         mockMvc.perform(multipart(UPLOAD_URL)
@@ -147,8 +110,6 @@ class DocumentControllerTest {
                 .andExpect(flash().attributeExists("message"));
 
         verify(ingestionService).ingestDocument(any(), any());
-
-        logTestSuccess("Document upload without metadata completed");
     }
 
     @Test
@@ -156,9 +117,7 @@ class DocumentControllerTest {
     @Story("Валидация")
     @Severity(SeverityLevel.CRITICAL)
     void testUploadEmptyFile() throws Exception {
-        logTestStart("Testing empty file upload");
-
-        MockMultipartFile emptyFile = new MockMultipartFile(
+        var emptyFile = new MockMultipartFile(
                 FILE_PARAM,
                 "empty.txt",
                 MediaType.TEXT_PLAIN_VALUE,
@@ -172,10 +131,7 @@ class DocumentControllerTest {
                 .andExpect(redirectedUrl(REDIRECT_URL))
                 .andExpect(flash().attributeExists("message"));
 
-        // ✅ Пустой файл НЕ должен вызывать сервис
         verify(ingestionService, never()).ingestDocument(any(), anyString());
-
-        logTestSuccess("Empty file handled correctly");
     }
 
     @Test
@@ -183,10 +139,8 @@ class DocumentControllerTest {
     @Story("Валидация")
     @Severity(SeverityLevel.CRITICAL)
     void testUploadLargeFile() throws Exception {
-        logTestStart("Testing large file upload");
-
-        byte[] largeContent = new byte[11 * 1024 * 1024]; // 11MB
-        MockMultipartFile largeFile = new MockMultipartFile(
+        var largeContent = new byte[11 * 1024 * 1024];
+        var largeFile = new MockMultipartFile(
                 FILE_PARAM,
                 "large.txt",
                 MediaType.TEXT_PLAIN_VALUE,
@@ -200,10 +154,7 @@ class DocumentControllerTest {
                 .andExpect(redirectedUrl(REDIRECT_URL))
                 .andExpect(flash().attributeExists("message"));
 
-        // ✅ Большой файл НЕ должен вызывать сервис
         verify(ingestionService, never()).ingestDocument(any(), anyString());
-
-        logTestSuccess("Large file handled correctly");
     }
 
     @Test
@@ -211,11 +162,8 @@ class DocumentControllerTest {
     @Story("Обработка ошибок")
     @Severity(SeverityLevel.CRITICAL)
     void testUploadDocumentWhenServiceThrowsDocumentIngestionException() throws Exception {
-        logTestStart("Testing DocumentIngestionException handling");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // Настраиваем мок - документ не существует
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(false);
         doThrow(new DocumentIngestionException("Document error"))
                 .when(ingestionService).ingestDocument(any(), anyString());
@@ -228,8 +176,6 @@ class DocumentControllerTest {
                 .andExpect(flash().attributeExists("message"));
 
         verify(ingestionService).ingestDocument(any(), anyString());
-
-        logTestSuccess("DocumentIngestionException handled correctly");
     }
 
     @Test
@@ -237,11 +183,8 @@ class DocumentControllerTest {
     @Story("Обработка ошибок")
     @Severity(SeverityLevel.NORMAL)
     void testUploadDocumentWhenServiceThrowsException() throws Exception {
-        logTestStart("Testing general exception handling");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // Настраиваем мок - документ не существует
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(false);
         doThrow(new RuntimeException("Processing error"))
                 .when(ingestionService).ingestDocument(any(), anyString());
@@ -254,8 +197,6 @@ class DocumentControllerTest {
                 .andExpect(flash().attributeExists("message"));
 
         verify(ingestionService).ingestDocument(any(), anyString());
-
-        logTestSuccess("General exception handled correctly");
     }
 
     @Test
@@ -263,11 +204,8 @@ class DocumentControllerTest {
     @Story("Загрузка документов")
     @Severity(SeverityLevel.NORMAL)
     void testUploadDocumentWithForce() throws Exception {
-        logTestStart("Testing document upload with force flag");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // ✅ Настраиваем мок - документ СУЩЕСТВУЕТ
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(true);
         doNothing().when(ingestionService).reIngestDocument(any(), anyString());
 
@@ -279,11 +217,8 @@ class DocumentControllerTest {
                 .andExpect(redirectedUrl(REDIRECT_URL))
                 .andExpect(flash().attributeExists("message"));
 
-        // ✅ Должен вызываться reIngestDocument, а не ingestDocument
         verify(ingestionService).reIngestDocument(any(), anyString());
         verify(ingestionService, never()).ingestDocument(any(), anyString());
-
-        logTestSuccess("Document upload with force completed");
     }
 
     @Test
@@ -291,11 +226,8 @@ class DocumentControllerTest {
     @Story("Загрузка документов")
     @Severity(SeverityLevel.NORMAL)
     void testUploadExistingDocumentWithoutForce() throws Exception {
-        logTestStart("Testing existing document without force");
+        var file = createMultipartFile(FILE_NAME, FILE_CONTENT);
 
-        MockMultipartFile file = createMultipartFile(FILE_NAME, FILE_CONTENT);
-
-        // Настраиваем мок - документ СУЩЕСТВУЕТ
         when(ingestionService.documentExists(FILE_NAME)).thenReturn(true);
 
         mockMvc.perform(multipart(UPLOAD_URL)
@@ -305,25 +237,15 @@ class DocumentControllerTest {
                 .andExpect(redirectedUrl(REDIRECT_URL))
                 .andExpect(flash().attributeExists("message"));
 
-        // ✅ Должен вызываться documentExists, но НЕ ingestDocument
         verify(ingestionService).documentExists(FILE_NAME);
         verify(ingestionService, never()).ingestDocument(any(), anyString());
         verify(ingestionService, never()).reIngestDocument(any(), anyString());
-
-        logTestSuccess("Existing document without force handled correctly");
     }
 
     // ============================================================
     // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     // ============================================================
 
-    /**
-     * Создает MockMultipartFile для тестирования.
-     *
-     * @param fileName имя файла
-     * @param content  содержимое файла
-     * @return MockMultipartFile
-     */
     private MockMultipartFile createMultipartFile(String fileName, String content) {
         return new MockMultipartFile(
                 FILE_PARAM,
@@ -331,32 +253,5 @@ class DocumentControllerTest {
                 MediaType.TEXT_PLAIN_VALUE,
                 content.getBytes(StandardCharsets.UTF_8)
         );
-    }
-
-    /**
-     * Логирует начало теста.
-     *
-     * @param message сообщение для логирования
-     */
-    private void logTestStart(String message) {
-        log.info("🚀 [{}] {}", getTestName(), message);
-    }
-
-    /**
-     * Логирует успешное завершение теста.
-     *
-     * @param message сообщение для логирования
-     */
-    private void logTestSuccess(String message) {
-        log.info("✅ [{}] {}", getTestName(), message);
-    }
-
-    /**
-     * Возвращает имя теста.
-     *
-     * @return имя класса теста
-     */
-    private String getTestName() {
-        return getClass().getSimpleName();
     }
 }

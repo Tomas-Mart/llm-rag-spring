@@ -1,7 +1,9 @@
 package com.example.rag.service;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.imageio.ImageIO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.extern.slf4j.Slf4j;
@@ -41,13 +43,25 @@ public class OcrService {
      */
     public OcrService() {
         this.tesseract = new Tesseract();
-        // Путь к папке с языковыми данными Tesseract в контейнере
-        this.tesseract.setDatapath("/usr/share/tesseract-ocr/5/tessdata/");
-        // Языки: русский + английский (можно добавить другие через пробел)
+
+        // Пробуем разные пути к tessdata
+        String[] possiblePaths = {
+                "/usr/share/tesseract-ocr/5/tessdata/",
+                "/usr/share/tesseract-ocr/4.00/tessdata/",
+                "/usr/share/tesseract/tessdata/",
+                System.getenv("TESSDATA_PREFIX")
+        };
+
+        for (String path : possiblePaths) {
+            if (path != null && new File(path).exists()) {
+                this.tesseract.setDatapath(path);
+                log.info("✅ Tesseract использует путь: {}", path);
+                break;
+            }
+        }
+
         this.tesseract.setLanguage("rus+eng");
-        // Режим сегментации страницы: 1 = Automatic page segmentation with OSD
         this.tesseract.setPageSegMode(1);
-        // Режим OCR движка: 1 = LSTM only (более точный)
         this.tesseract.setOcrEngineMode(1);
         log.info("✅ Tesseract OCR инициализирован");
     }
@@ -63,8 +77,8 @@ public class OcrService {
         try (InputStream inputStream = file.getInputStream()) {
             log.info("🔍 Распознавание текста из изображения: {}", file.getOriginalFilename());
 
-            // 🔧 ИСПРАВЛЕНО: используем BufferedImage вместо InputStream
-            java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(inputStream);
+            // ⭐ Используем var (Java 21)
+            var image = ImageIO.read(inputStream);
 
             if (image == null) {
                 log.warn("⚠️ Не удалось прочитать изображение: {}", file.getOriginalFilename());
@@ -115,11 +129,7 @@ public class OcrService {
 
         // Проверка по MIME типу
         String contentType = file.getContentType();
-        if (contentType != null && contentType.startsWith("image/")) {
-            return true;
-        }
-
-        return false;
+        return contentType != null && contentType.startsWith("image/");
     }
 
     /**
@@ -129,8 +139,7 @@ public class OcrService {
      */
     public boolean isTesseractAvailable() {
         try {
-            // Проверяем, что tesseract может выполнить простую команду
-            Process process = Runtime.getRuntime().exec(new String[]{"tesseract", "--version"});
+            var process = Runtime.getRuntime().exec(new String[]{"tesseract", "--version"});
             return process.waitFor() == 0;
         } catch (Exception e) {
             log.warn("⚠️ Tesseract не доступен: {}", e.getMessage());

@@ -1,24 +1,61 @@
+# ============================================================
+# JAVA
+# ============================================================
+
 # Compiled files
 target/
 *.class
 
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# ============================================================
 # IDE
+# ============================================================
+
+# IntelliJ IDEA
 .idea/
 *.iml
-.vscode/
-.settings/
-.project
-.classpath
 *.iws
 *.ipr
 out/
 .idea_modules/
-.atom/
-.buildpath/
+
+# Eclipse
+.settings/
+.project
+.classpath
+*.prefs
+
+# VS Code
+.vscode/
 *.code-workspace
 .vscode-test/
+.atom/
 
-# Logs
+# NetBeans
+nbproject/
+nb-configuration.xml
+*.nbattrs
+
+# ============================================================
+# LOGS
+# ============================================================
+
 logs/
 *.log
 *.log.*
@@ -26,29 +63,52 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local config
+# ============================================================
+# LOCAL CONFIGURATION
+# ============================================================
+
 application-local.yml
+application-dev.yml
+application-prod.yml
+*.local.yml
+*.dev.yml
+*.prod.yml
 .env
 .env.local
 .env.*.local
 
-# OS
+# ============================================================
+# OPERATING SYSTEMS
+# ============================================================
+
+# macOS
 .DS_Store
-Thumbs.db
 .AppleDouble
 .LSOverride
 ._*
+
+# Windows
+Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
-.directory
 
-# Maven local repository
+# Linux
+.directory
+*~
+
+# ============================================================
+# MAVEN
+# ============================================================
+
 **/.m2/
 .m2/
 ~/.m2/
 
-# Test reports
+# ============================================================
+# TEST REPORTS
+# ============================================================
+
 .allure/
 allure-results/
 allure-report/
@@ -57,12 +117,18 @@ surefire-reports/
 failsafe-reports/
 coverage/
 *.cover
+target/surefire-reports/
+target/failsafe-reports/
 
-# Backups and archives
+# ============================================================
+# BACKUPS & ARCHIVES
+# ============================================================
+
 *.tar.gz
 *.tar
 *.zip
 *.7z
+*.rar
 ollama_backup.tar.gz
 *.backup
 *.bak
@@ -72,26 +138,36 @@ ollama_backup.tar.gz
 *.swo
 *~
 
-# Local scripts
+# ============================================================
+# LOCAL SCRIPTS
+# ============================================================
+
 run-offline.sh
 test-app.sh
 *.local.sh
+reset.sh
+diagnose.sh
 
-# Docker
+# ============================================================
+# DOCKER
+# ============================================================
+
 docker-data/
 volumes/
 *.pid
 docker-compose.override.yml
 .dockerignore
 
-# Spring Boot devtools
+# ============================================================
+# SPRING BOOT
+# ============================================================
+
 spring-boot-devtools.properties
 
-# Maven wrapper
-.mvn/wrapper/maven-wrapper.jar
-.mvn/wrapper/maven-wrapper.properties
+# ============================================================
+# APPLICATION SPECIFIC
+# ============================================================
 
-# Application specific
 *.db
 *.db-shm
 *.db-wal
@@ -107,7 +183,10 @@ uploads/
 temp/
 tmp/
 
-# Secret files
+# ============================================================
+# SECURITY
+# ============================================================
+
 *.p12
 *.pfx
 *.keystore
@@ -116,20 +195,22 @@ tmp/
 *.crt
 *.key
 *.p8
+*.p12
+*.jks
 
-# Test artifacts
-*.test
-*.it
-target/surefire-reports/
-target/failsafe-reports/
+# ============================================================
+# NODE.JS
+# ============================================================
 
-# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Python
+# ============================================================
+# PYTHON
+# ============================================================
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -141,15 +222,107 @@ ENV/
 env.bak/
 venv.bak/
 
-# Gradle
-.gradle/
-build/
-gradle-app.setting
-!gradle-wrapper.jar
+# ============================================================
+# GENERATED FILES
+# ============================================================
 
-# Generated files
 .history/
 .nyc_output/
 out/
-dist/C:/Users/*/.m2/
-ollama_backup.tar.gz
+dist/
+target/site/
+target/generated-sources/
+target/generated-test-sources/
+
+# ============================================================
+# DEPENDENCY CHECK
+# ============================================================
+
+dependency-check-*.html
+dependency-check-*.xml
+target/dependency-check-*
+
+# ============================================================
+# JACOCO
+# ============================================================
+
+*.exec
+target/jacoco-*.exec
+
+# ============================================================
+# SONAR
+# ============================================================
+
+.sonar/
+scanner-report/
+
+# ============================================================
+# ALLURE
+# ============================================================
+
+allure-results/
+allure-report/
+
+# ============================================================
+# APPLICATION
+# ============================================================
+
+*.hprof
+*.dump
+*.heap
+heapdump.*
+
+# ============================================================
+# SYSTEM
+# ============================================================
+
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+*.sqlite
+*.sqlite3
+*.postgresql
+*.postgres
+*.dump
+*.pgdump
+*.backup
+
+# ============================================================
+# FRONTEND
+# ============================================================
+
+dist/
+build/
+node_modules/
+package-lock.json
+yarn.lock
+
+# ============================================================
+# TEST ARTIFACTS
+# ============================================================
+
+*.test
+*.it
+target/test-classes/
+target/integration-test-classes/
+target/performance-test-classes/
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
+
+*.iml
+*.classpath
+*.project
+*.settings
+*.factorypath
+*.recommenders
+*.idea
+*.vscode
+*.gitattributes

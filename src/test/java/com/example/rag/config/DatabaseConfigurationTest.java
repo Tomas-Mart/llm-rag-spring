@@ -1,5 +1,6 @@
 package com.example.rag.config;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,29 +19,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Тест для проверки конфигурации базы данных.
- *
- * <h2>Назначение</h2>
- * <p>Проверяет подключение к DataSource и базовые операции с БД.</p>
- *
- * <h2>Тестируемые аспекты</h2>
+ * <p>
+ * Проверяет:
  * <ul>
  *   <li>Наличие и доступность DataSource</li>
  *   <li>Установление соединения с базой данных</li>
  *   <li>Выполнение простых SQL запросов</li>
- *   <li>Проверка, что используется PostgreSQL, а не H2</li>
+ *   <li>Проверка, что используется H2 для модульных тестов</li>
  * </ul>
- *
- * <h2>Пример запуска</h2>
- * <pre>{@code
- * // Запустить все тесты
- * mvn test -Dtest=DatabaseConfigurationTest
- *
- * // Запустить конкретный тест
- * mvn test -Dtest=DatabaseConfigurationTest#testDatabaseConnection
- * }</pre>
+ * <p>
+ * <b>Важно:</b> Для модульных тестов используется H2, поэтому pgvector НЕ проверяется.
+ * Проверка pgvector вынесена в интеграционные тесты (BaseIntegrationTest).
  *
  * @author RAG Application Team
- * @version 5.0
+ * @version 6.1
  * @see BaseTest
  * @see TestUtils
  * @since 1.0
@@ -61,8 +53,13 @@ class DatabaseConfigurationTest extends BaseTest {
     // ТЕСТЫ
     // ============================================================
 
+    /**
+     * Проверяет, что DataSource доступен и подключение работает.
+     *
+     * @throws SQLException если ошибка подключения к базе данных
+     */
     @Test
-    @Description("Проверка, что DataSource доступен и подключение работает")
+    @Description("Проверка доступности DataSource")
     @Story("Подключение к БД")
     @Severity(SeverityLevel.CRITICAL)
     void testDataSource() throws SQLException {
@@ -80,19 +77,18 @@ class DatabaseConfigurationTest extends BaseTest {
             }
         });
 
-        assertThat(dataSource)
-                .as("DataSource should be available")
-                .isNotNull();
-
-        // Проверяем, что используется PostgreSQL
-        verifyPostgreSqlDriver();
-
+        verifyH2Driver();
         log.info("✅ DataSource configured correctly");
         logTestSuccess("DataSource availability verified");
     }
 
+    /**
+     * Проверяет, что DataSource правильно сконфигурирован.
+     *
+     * @throws SQLException если ошибка подключения к базе данных
+     */
     @Test
-    @Description("Проверка, что DataSource правильно сконфигурирован")
+    @Description("Проверка конфигурации DataSource")
     @Story("Конфигурация DataSource")
     @Severity(SeverityLevel.CRITICAL)
     void testDataSourceIsConfigured() throws SQLException {
@@ -100,15 +96,22 @@ class DatabaseConfigurationTest extends BaseTest {
 
         assertMocksCreated();
         assertDataSourceAvailable();
-
-        verifyPostgreSqlDriver();
+        verifyH2Driver();
 
         log.info("✅ DataSource configuration verified");
         logTestSuccess("DataSource configuration verified");
     }
 
+    /**
+     * Проверяет выполнение SQL запроса.
+     * <p>
+     * <b>Примечание:</b> Проверка pgvector выполняется только в интеграционных тестах,
+     * так как H2 не поддерживает расширения PostgreSQL.
+     *
+     * @throws SQLException если ошибка выполнения запроса
+     */
     @Test
-    @Description("Проверка выполнения простого SQL запроса")
+    @Description("Проверка выполнения SQL запроса")
     @Story("SQL запросы")
     @Severity(SeverityLevel.CRITICAL)
     void testDatabaseConnection() throws SQLException {
@@ -121,22 +124,10 @@ class DatabaseConfigurationTest extends BaseTest {
                     .as("Connection should be valid")
                     .isTrue();
 
-            try (var statement = connection.createStatement();
-                 var resultSet = statement.executeQuery("SELECT 1")) {
+            // Выполняем простой запрос
+            executeSimpleQuery(connection);
 
-                assertThat(resultSet.next())
-                        .as("Should execute query successfully")
-                        .isTrue();
-
-                assertThat(resultSet.getInt(1))
-                        .as("Should return 1")
-                        .isEqualTo(1);
-            }
-
-            // Проверяем pgvector
-            verifyPgvectorExtension(connection);
-
-            log.info("✅ Database query executed successfully");
+            log.info("✅ Database query executed successfully (H2 in-memory)");
         } catch (SQLException e) {
             log.error("❌ Database connection failed: {}", e.getMessage());
             throw e;
@@ -150,31 +141,58 @@ class DatabaseConfigurationTest extends BaseTest {
     // ============================================================
 
     /**
-     * Проверяет, что используется PostgreSQL драйвер.
+     * Выполняет простой SQL запрос для проверки соединения.
+     *
+     * @param connection подключение к базе данных
+     * @throws SQLException если ошибка выполнения запроса
      */
-    private void verifyPostgreSqlDriver() {
-        String driver = environment.getProperty("spring.datasource.driver-class-name");
-        assertThat(driver)
-                .as("Driver should be PostgreSQL")
-                .isEqualTo("org.postgresql.Driver");
+    private void executeSimpleQuery(Connection connection) throws SQLException {
+        try (var statement = connection.createStatement();
+             var resultSet = statement.executeQuery("SELECT 1")) {
 
-        String url = environment.getProperty("spring.datasource.url");
+            assertThat(resultSet.next())
+                    .as("Query should return result")
+                    .isTrue();
+
+            assertThat(resultSet.getInt(1))
+                    .as("Result should be 1")
+                    .isEqualTo(1);
+
+            log.debug("   ✅ Simple query executed successfully");
+        }
+    }
+
+    /**
+     * Проверяет, что используется H2 драйвер для модульных тестов.
+     */
+    private void verifyH2Driver() {
+        var driver = environment.getProperty("spring.datasource.driver-class-name");
+        var url = environment.getProperty("spring.datasource.url");
+
+        // Для модульных тестов используем H2
+        assertThat(driver)
+                .as("Driver should be H2 for unit tests")
+                .isEqualTo("org.h2.Driver");
+
         assertThat(url)
-                .as("URL should be PostgreSQL")
-                .contains("postgresql")
-                .doesNotContain("h2");
+                .as("URL should be H2 for unit tests")
+                .contains("h2")
+                .doesNotContain("postgresql");
 
         log.debug("   Driver: {}", driver);
         log.debug("   URL: {}", url);
     }
 
     /**
-     * Проверяет, что pgvector установлен.
+     * Проверяет, что pgvector расширение установлено.
+     * <p>
+     * <b>Важно:</b> Этот метод используется ТОЛЬКО в интеграционных тестах с PostgreSQL.
+     * Для модульных тестов с H2 эта проверка пропускается.
      *
-     * @param connection подключение к БД
+     * @param connection подключение к базе данных
      * @throws SQLException если ошибка выполнения запроса
      */
-    private void verifyPgvectorExtension(java.sql.Connection connection) throws SQLException {
+    private void verifyPgvectorExtension(Connection connection) throws SQLException {
         try (var stmt = connection.createStatement();
              var rs = stmt.executeQuery("SELECT extname FROM pg_extension WHERE extname = 'vector'")) {
 

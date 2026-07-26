@@ -41,6 +41,16 @@ import lombok.extern.slf4j.Slf4j;
 public class DocumentIngestionService {
 
     /**
+     * Максимальный размер файла для загрузки (10 МБ).
+     */
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+    /**
+     * Размер пакета для сохранения чанков в векторное хранилище.
+     */
+    private static final int BATCH_SIZE = 50;
+
+    /**
      * Хранилище векторов для эмбеддингов документов.
      */
     private final VectorStore vectorStore;
@@ -80,32 +90,38 @@ public class DocumentIngestionService {
         log.info("📄 Тип файла: {}, Размер: {} байт", file.getContentType(), file.getSize());
 
         try {
-            // 1. Проверяем, существует ли уже такой документ
-            Optional<DocumentEntity> existingDoc = documentRepository.findByFileName(fileName);
+            // 1. Проверка размера файла
+            if (file.getSize() > MAX_FILE_SIZE) {
+                throw new DocumentIngestionException(
+                        "Размер файла превышает " + MAX_FILE_SIZE / (1024 * 1024) + " МБ"
+                );
+            }
 
+            // 2. Проверяем, существует ли уже такой документ
+            Optional<DocumentEntity> existingDoc = documentRepository.findByFileName(fileName);
             if (existingDoc.isPresent()) {
                 log.warn("⚠️ Документ '{}' уже существует в БД. Пропускаем загрузку.", fileName);
                 throw new DocumentIngestionException("Документ '" + fileName + "' уже существует в БД");
             }
 
-            // 2. Читаем содержимое файла (с очисткой)
+            // 3. Читаем содержимое файла (с очисткой)
             String content = readFileContent(file);
 
-            // 3. Проверяем, что содержимое не пустое
+            // 4. Проверяем, что содержимое не пустое
             if (content == null || content.trim().isEmpty()) {
                 throw new DocumentIngestionException("Файл пуст или содержит только бинарные данные: " + fileName);
             }
 
-            // 4. Создаём документ
+            // 5. Создаём документ
             Document document = createDocument(content, fileName, metadata);
 
-            // 5. Разбиваем на чанки
+            // 6. Разбиваем на чанки
             List<Document> chunks = splitDocumentIntoChunks(document);
 
-            // 6. Сохраняем эмбеддинги (вызываем напрямую)
+            // 7. Сохраняем эмбеддинги
             saveEmbeddings(chunks, fileName);
 
-            // 7. Сохраняем метаданные (вызываем напрямую)
+            // 8. Сохраняем метаданные
             saveDocumentMetadata(content, fileName, metadata);
 
             log.info("✅ Документ '{}' загружен успешно", fileName);
@@ -320,6 +336,7 @@ public class DocumentIngestionService {
 
     /**
      * Сохраняет эмбеддинги чанков в векторную базу данных.
+     * Для больших документов использует пакетную обработку.
      *
      * @param chunks   список чанков документа
      * @param fileName имя файла (для логирования)
@@ -327,7 +344,16 @@ public class DocumentIngestionService {
      */
     private void saveEmbeddings(List<Document> chunks, String fileName) throws DocumentIngestionException {
         try {
-            vectorStore.add(chunks);
+            if (chunks.size() > BATCH_SIZE) {
+                // Пакетная обработка для больших документов
+                for (int i = 0; i < chunks.size(); i += BATCH_SIZE) {
+                    int end = Math.min(i + BATCH_SIZE, chunks.size());
+                    vectorStore.add(chunks.subList(i, end));
+                    log.debug("✅ Сохранена партия {}-{} из {}", i, end, chunks.size());
+                }
+            } else {
+                vectorStore.add(chunks);
+            }
             log.debug("✅ Эмбеддинги сохранены в векторную БД");
         } catch (Exception e) {
             log.error("❌ Ошибка при сохранении эмбеддингов: {}", e.getMessage());
@@ -378,12 +404,95 @@ public class DocumentIngestionService {
     }
 
     /**
+     * Удаляет документ по ID.
+     *
+     * @param id ID документа
+     * @return true если документ удален, false если не найден
+     */
+    @Transactional
+    public boolean deleteDocument(Long id) {
+        log.info("🗑️ Удаление документа: {}", id);
+
+        if (!documentRepository.existsById(id)) {
+            log.warn("⚠️ Документ с ID {} не найден", id);
+            return false;
+        }
+
+        documentRepository.deleteById(id);
+        log.info("✅ Документ удален: {}", id);
+        return true;
+    }
+
+    /**
+     * Удаляет документ по имени файла.
+     *
+     * @param fileName имя файла
+     * @return true если документ удален, false если не найден
+     */
+    @Transactional
+    public boolean deleteDocumentByFileName(String fileName) {
+        log.info("🗑️ Удаление документа по имени: {}", fileName);
+
+        Optional<DocumentEntity> doc = documentRepository.findByFileName(fileName);
+        if (doc.isEmpty()) {
+            log.warn("⚠️ Документ с именем {} не найден", fileName);
+            return false;
+        }
+
+        documentRepository.deleteByFileName(fileName);
+        log.info("✅ Документ удален: {}", fileName);
+        return true;
+    }
+
+    /**
      * Проверяет, существует ли документ с указанным именем файла.
      *
      * @param fileName имя файла
      * @return {@code true} если документ существует, {@code false} в противном случае
      */
+    @Transactional(readOnly = true)
     public boolean documentExists(String fileName) {
         return documentRepository.findByFileName(fileName).isPresent();
+    }
+
+    /**
+     * Возвращает документ по ID.
+     *
+     * @param id ID документа
+     * @return Optional с документом или пустой Optional
+     */
+    @Transactional(readOnly = true)
+    public Optional<DocumentEntity> getDocument(Long id) {
+        return documentRepository.findById(id);
+    }
+
+    /**
+     * Возвращает документ по имени файла.
+     *
+     * @param fileName имя файла
+     * @return Optional с документом или пустой Optional
+     */
+    @Transactional(readOnly = true)
+    public Optional<DocumentEntity> getDocumentByFileName(String fileName) {
+        return documentRepository.findByFileName(fileName);
+    }
+
+    /**
+     * Возвращает все документы.
+     *
+     * @return список всех документов
+     */
+    @Transactional(readOnly = true)
+    public List<DocumentEntity> getAllDocuments() {
+        return documentRepository.findAll();
+    }
+
+    /**
+     * Очищает все документы (только для тестов).
+     */
+    @Transactional
+    public void clearAllDocuments() {
+        log.warn("🧹 Очистка всех документов (только для тестов)");
+        documentRepository.deleteAll();
     }
 }
