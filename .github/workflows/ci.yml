@@ -103,7 +103,7 @@ jobs:
           fail-on-error: false
 
   # ============================================
-  # 3. INTEGRATION TESTS
+  # 3. INTEGRATION TESTS - Testcontainers сам запустит контейнеры!
   # ============================================
   integration-tests:
     name: 🔗 Integration Tests
@@ -115,31 +115,7 @@ jobs:
       github.ref == 'refs/heads/main' || 
       github.ref == 'refs/heads/develop'
 
-    # ДОБАВЛЕНЫ СЕРВИСЫ ДЛЯ ИНТЕГРАЦИОННЫХ ТЕСТОВ
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: rag_integration_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        ports:
-          - 32769:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      ollama:
-        image: ollama/ollama:latest
-        ports:
-          - 11434:11434
-        options: >-
-          --health-cmd "ollama list"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 3
+    # НЕ НУЖНЫ services! Testcontainers сам запустит PostgreSQL
 
     steps:
       - uses: actions/checkout@v4
@@ -150,11 +126,6 @@ jobs:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           cache: maven
 
-      - name: Pull Ollama models
-        run: |
-          docker exec $(docker ps -q -f name=ollama) ollama pull nomic-embed-text:v1.5 || true
-          docker exec $(docker ps -q -f name=ollama) ollama pull qwen2.5-coder:7b || true
-
       - name: Run Integration Tests
         run: |
           mvn verify -Pintegration-tests \
@@ -163,6 +134,7 @@ jobs:
             -Dmaven.test.failure.ignore=true \
             -Dtest="!**/*PerformanceTest.java" \
             -Dfailsafe.rerunFailingTestsCount=2 \
+            -Djacoco.skip=true \
             -B
 
       - name: Upload reports

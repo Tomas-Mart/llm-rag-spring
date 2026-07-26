@@ -20,10 +20,15 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import com.example.rag.Application;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         classes = Application.class
@@ -34,36 +39,55 @@ import lombok.extern.slf4j.Slf4j;
 @Tag("integration")
 public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationTest {
 
-    private static final String EXISTING_POSTGRES_URL = "jdbc:postgresql://localhost:32769/rag_integration_test";
-    private static final String EXISTING_POSTGRES_USER = "test_user";
-    private static final String EXISTING_POSTGRES_PASSWORD = "test_password";
-    private static final String EXISTING_OLLAMA_URL = "http://localhost:11434";
     private static final int EMBEDDING_DIMENSION = 768;
+
+    // ============================================================
+    // TESTCONTAINERS POSTGRESQL
+    // ============================================================
+    @Container
+    protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
+            new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16"))
+                    .withDatabaseName("rag_integration_test")
+                    .withUsername("test_user")
+                    .withPassword("test_password")
+                    .withReuse(true);  // Включить reuse для ускорения локальных тестов
 
     static {
         log.info("========================================");
-        log.info("🐘 PostgreSQL: {}", EXISTING_POSTGRES_URL);
-        log.info("🦙 Ollama: {}", EXISTING_OLLAMA_URL);
-        log.info("✅ Using existing containers for integration tests");
+        log.info("🐘 PostgreSQL Testcontainer starting...");
         log.info("========================================");
     }
 
+    // ============================================================
+    // ДИНАМИЧЕСКАЯ КОНФИГУРАЦИЯ
+    // ============================================================
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> EXISTING_POSTGRES_URL);
-        registry.add("spring.datasource.username", () -> EXISTING_POSTGRES_USER);
-        registry.add("spring.datasource.password", () -> EXISTING_POSTGRES_PASSWORD);
+        registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
+        registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("spring.ai.ollama.base-url", () -> EXISTING_OLLAMA_URL);
-        registry.add("spring.ai.ollama.chat.options.model", () -> "qwen2.5-coder:7b");
-        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
         registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> String.valueOf(EMBEDDING_DIMENSION));
 
-        log.info("✅ Dynamic properties configured for existing containers");
+        // Ollama можно использовать существующий или тоже в контейнере
+        // Если Ollama не запущен локально, можно добавить второй контейнер
+        registry.add("spring.ai.ollama.base-url", () ->
+                System.getenv("OLLAMA_URL") != null ?
+                        System.getenv("OLLAMA_URL") :
+                        "http://localhost:11434"
+        );
+        registry.add("spring.ai.ollama.chat.options.model", () -> "qwen2.5-coder:7b");
+        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
+
+        log.info("✅ Dynamic properties configured for Testcontainers");
+        log.info("🐘 PostgreSQL JDBC URL: {}", POSTGRES_CONTAINER.getJdbcUrl());
     }
 
+    // ============================================================
+    // КОНФИГУРАЦИЯ МОКОВ
+    // ============================================================
     @Configuration
     @Profile("integration-test")
     public static class MockConfig {
@@ -89,18 +113,15 @@ public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationT
                 public @NotNull EmbeddingResponse call(@NotNull EmbeddingRequest request) {
                     List<String> texts = new ArrayList<>();
 
-                    // Получаем инструкции из запроса
                     List<?> list = request.getInstructions();
                     for (Object item : list) {
                         if (item instanceof String) {
                             texts.add((String) item);
                         } else {
-                            // Если это не строка, используем toString()
                             texts.add(item != null ? item.toString() : "");
                         }
                     }
 
-                    // Если тексты пустые, добавляем пустую строку
                     if (texts.isEmpty()) {
                         texts.add("");
                     }
