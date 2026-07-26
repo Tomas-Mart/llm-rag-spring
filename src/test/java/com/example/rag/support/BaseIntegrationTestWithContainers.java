@@ -21,14 +21,13 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import com.example.rag.Application;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers(disabledWithoutDocker = true)  // ← Добавлено
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         classes = Application.class
@@ -41,26 +40,31 @@ public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationT
 
     private static final int EMBEDDING_DIMENSION = 768;
 
-    // ============================================================
-    // TESTCONTAINERS POSTGRESQL
-    // ============================================================
-    @Container
-    protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
+    private static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(DockerImageName.parse("pgvector/pgvector:pg16"))
                     .withDatabaseName("rag_integration_test")
                     .withUsername("test_user")
                     .withPassword("test_password")
-                    .withReuse(true);  // Включить reuse для ускорения локальных тестов
+                    .withReuse(true);
 
     static {
         log.info("========================================");
         log.info("🐘 PostgreSQL Testcontainer starting...");
+        POSTGRES_CONTAINER.start();
+        log.info("✅ PostgreSQL container started");
+        log.info("   📍 JDBC URL: {}", POSTGRES_CONTAINER.getJdbcUrl());
+        log.info("   🔌 Host: {}", POSTGRES_CONTAINER.getHost());
+        log.info("   🔌 Port: {}", POSTGRES_CONTAINER.getMappedPort(5432));
         log.info("========================================");
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (POSTGRES_CONTAINER.isRunning()) {
+                POSTGRES_CONTAINER.stop();
+                log.info("🐘 PostgreSQL container stopped");
+            }
+        }));
     }
 
-    // ============================================================
-    // ДИНАМИЧЕСКАЯ КОНФИГУРАЦИЯ
-    // ============================================================
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
@@ -70,24 +74,15 @@ public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationT
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> String.valueOf(EMBEDDING_DIMENSION));
-
-        // Ollama можно использовать существующий или тоже в контейнере
-        // Если Ollama не запущен локально, можно добавить второй контейнер
         registry.add("spring.ai.ollama.base-url", () ->
-                System.getenv("OLLAMA_URL") != null ?
-                        System.getenv("OLLAMA_URL") :
-                        "http://localhost:11434"
+                System.getenv("OLLAMA_URL") != null ? System.getenv("OLLAMA_URL") : "http://localhost:11434"
         );
         registry.add("spring.ai.ollama.chat.options.model", () -> "qwen2.5-coder:7b");
         registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
 
-        log.info("✅ Dynamic properties configured for Testcontainers");
-        log.info("🐘 PostgreSQL JDBC URL: {}", POSTGRES_CONTAINER.getJdbcUrl());
+        log.info("✅ Dynamic properties configured");
     }
 
-    // ============================================================
-    // КОНФИГУРАЦИЯ МОКОВ
-    // ============================================================
     @Configuration
     @Profile("integration-test")
     public static class MockConfig {
@@ -95,14 +90,13 @@ public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationT
         @Bean
         @Primary
         public EmbeddingModel embeddingModel() {
-            log.info("🔧 Creating test EmbeddingModel with random vectors (dimension: {})", EMBEDDING_DIMENSION);
+            log.info("🔧 Creating test EmbeddingModel (dimension: {})", EMBEDDING_DIMENSION);
 
             return new EmbeddingModel() {
 
                 private float[] generateEmbedding(String text) {
                     float[] vector = new float[EMBEDDING_DIMENSION];
                     int hash = text != null ? text.hashCode() : 0;
-
                     for (int i = 0; i < EMBEDDING_DIMENSION; i++) {
                         vector[i] = (float) (Math.sin(hash + i * 0.1) * 0.5 + 0.5);
                     }
@@ -112,43 +106,27 @@ public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationT
                 @Override
                 public @NotNull EmbeddingResponse call(@NotNull EmbeddingRequest request) {
                     List<String> texts = new ArrayList<>();
-
                     List<?> list = request.getInstructions();
                     for (Object item : list) {
-                        if (item instanceof String) {
-                            texts.add((String) item);
-                        } else {
-                            texts.add(item != null ? item.toString() : "");
-                        }
+                        texts.add(item != null ? item.toString() : "");
                     }
-
-                    if (texts.isEmpty()) {
-                        texts.add("");
-                    }
+                    if (texts.isEmpty()) texts.add("");
 
                     List<Embedding> embeddings = texts.stream()
                             .map(text -> new Embedding(generateEmbedding(text), 0))
                             .collect(Collectors.toList());
-
                     return new EmbeddingResponse(embeddings);
                 }
 
                 @Override
                 public float @NotNull [] embed(@NotNull Document document) {
-                    if (document.getText() == null || document.getText().trim().isEmpty()) {
-                        return new float[EMBEDDING_DIMENSION];
-                    }
                     return generateEmbedding(document.getText());
                 }
 
                 @Override
                 public @NotNull List<float[]> embed(@NotNull List<String> texts) {
-                    if (texts.isEmpty()) {
-                        return new ArrayList<>();
-                    }
-
                     return texts.stream()
-                            .map(text -> text != null ? generateEmbedding(text) : new float[EMBEDDING_DIMENSION])
+                            .map(this::generateEmbedding)
                             .collect(Collectors.toList());
                 }
 
