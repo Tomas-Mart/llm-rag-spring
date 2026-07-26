@@ -205,6 +205,34 @@ jobs:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           cache: maven
 
+      # Скачиваем отчеты интеграционных тестов
+      - name: Download integration test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-test-reports
+          path: target/
+
+      # Скачиваем отчеты модульных тестов
+      - name: Download unit test reports
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-reports
+          path: target/surefire-reports/
+
+      # Проверяем наличие отчетов
+      - name: Verify reports
+        run: |
+          echo "=== JaCoCo reports ==="
+          ls -la target/site/jacoco/ 2>/dev/null || echo "No jacoco reports found"
+          ls -la target/site/jacoco-it/ 2>/dev/null || echo "No jacoco-it reports found"
+          echo ""
+          echo "=== Test reports ==="
+          ls -la target/surefire-reports/ 2>/dev/null || echo "No surefire reports found"
+          ls -la target/failsafe-reports/ 2>/dev/null || echo "No failsafe reports found"
+          echo ""
+          echo "=== JaCoCo XML files ==="
+          find target -name "*.xml" -path "*/jacoco/*" 2>/dev/null || echo "No jacoco xml files found"
+
       - name: Sonar Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -216,6 +244,9 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.java.source=${{ env.JAVA_VERSION }} \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml \
+            -Dsonar.junit.reportPaths=target/surefire-reports,target/failsafe-reports \
+            -Dsonar.test.inclusions=**/*Test.java,**/*IT.java \
+            -Dsonar.tests=src/test/java \
             -B
 
       - name: Quality Gate Check
