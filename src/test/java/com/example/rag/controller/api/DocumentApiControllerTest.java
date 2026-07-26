@@ -1,211 +1,169 @@
 package com.example.rag.controller.api;
 
-import java.util.Map;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
 import com.example.rag.exception.DocumentIngestionException;
 import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.support.BaseIntegrationTestWithContainers;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Тесты для {@link DocumentApiController}.
+ * Интеграционные тесты для {@link DocumentApiController}.
  * Проверяют REST API эндпоинты для работы с документами.
- *
- * @author RAG Application Team
- * @version 1.0
- * @since 1.0
  */
-@ExtendWith(MockitoExtension.class)
-class DocumentApiControllerTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
+class DocumentApiControllerTest extends BaseIntegrationTestWithContainers {
 
-    // === МОКИ ===
+    @Autowired
+    private MockMvc mockMvc;
 
-    @Mock
+    @MockBean
     private DocumentIngestionService ingestionService;
-
-    @InjectMocks
-    private DocumentApiController controller;
-
-    // === ТЕСТОВЫЕ ДАННЫЕ ===
-
-    private MultipartFile testFile;
-    private String testFileName;
-    private String testMetadata;
-    private String testContent;
-
-    @BeforeEach
-    void setUp() {
-        testFileName = "test-document.txt";
-        testMetadata = "{\"author\":\"test\"}";
-        testContent = "Test document content for API tests.";
-        testFile = new MockMultipartFile(
-                "file",
-                testFileName,
-                "text/plain",
-                testContent.getBytes()
-        );
-    }
 
     // ============================================================
     // ТЕСТЫ ДЛЯ uploadDocument
     // ============================================================
 
-    /**
-     * Тест успешной загрузки документа.
-     */
     @Test
-    void testUploadDocument_Success() {
+    void testUploadDocument_Success() throws Exception {
         // Arrange
-        when(ingestionService.documentExists(testFileName)).thenReturn(false);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.txt",
+                "text/plain",
+                "Test content".getBytes()
+        );
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(testFile, testMetadata);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("message", "Document uploaded successfully")
-                .containsEntry("fileName", testFileName)
-                .containsKey("size");
-
-        verify(ingestionService).ingestDocument(testFile, testMetadata);
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file)
+                        .param("metadata", "test-metadata"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Document uploaded successfully"))
+                .andExpect(jsonPath("$.fileName").value("test.txt"))
+                .andExpect(jsonPath("$.size").exists());
 
         System.out.println("✅ Тест успешной загрузки документа пройден");
     }
 
-    /**
-     * Тест загрузки документа с null метаданными.
-     */
     @Test
-    void testUploadDocument_WithNullMetadata() {
+    void testUploadDocument_WithNullMetadata() throws Exception {
         // Arrange
-        when(ingestionService.documentExists(testFileName)).thenReturn(false);
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.txt",
+                "text/plain",
+                "Test content".getBytes()
+        );
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(testFile, null);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("message", "Document uploaded successfully")
-                .containsEntry("fileName", testFileName);
-
-        verify(ingestionService).ingestDocument(testFile, null);
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Document uploaded successfully"))
+                .andExpect(jsonPath("$.fileName").value("test.txt"))
+                .andExpect(jsonPath("$.size").exists());
 
         System.out.println("✅ Тест загрузки с null метаданными пройден");
     }
 
-    /**
-     * Тест загрузки пустого файла.
-     */
     @Test
-    void testUploadDocument_WithEmptyFile() {
+    void testUploadDocument_WithEmptyFile() throws Exception {
         // Arrange
-        MultipartFile emptyFile = new MockMultipartFile(
+        MockMultipartFile emptyFile = new MockMultipartFile(
                 "file",
                 "empty.txt",
                 "text/plain",
                 new byte[0]
         );
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(emptyFile, testMetadata);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", "Файл не выбран или пустой");
-
-        verify(ingestionService, never()).ingestDocument(any(), any());
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(emptyFile)
+                        .param("metadata", "test-metadata"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Файл не выбран или пустой"));
 
         System.out.println("✅ Тест пустого файла пройден");
     }
 
-    /**
-     * Тест загрузки файла с превышением размера.
-     */
     @Test
-    void testUploadDocument_WithFileTooLarge() {
+    void testUploadDocument_WithFileTooLarge() throws Exception {
         // Arrange
         byte[] largeContent = new byte[11 * 1024 * 1024];
-        MultipartFile largeFile = new MockMultipartFile(
+        MockMultipartFile largeFile = new MockMultipartFile(
                 "file",
                 "large.txt",
                 "text/plain",
                 largeContent
         );
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(largeFile, testMetadata);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", "Размер файла превышает 10MB");
-
-        verify(ingestionService, never()).ingestDocument(any(), any());
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(largeFile)
+                        .param("metadata", "test-metadata"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Размер файла превышает 10MB"));
 
         System.out.println("✅ Тест превышения размера файла пройден");
     }
 
-    /**
-     * Тест загрузки документа с ошибкой DocumentIngestionException.
-     */
     @Test
     void testUploadDocument_WhenIngestionFails() throws Exception {
         // Arrange
-        String errorMessage = "Document already exists";
-        doThrow(new DocumentIngestionException(errorMessage))
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.txt",
+                "text/plain",
+                "Test content".getBytes()
+        );
+
+        doThrow(new DocumentIngestionException("Document already exists"))
                 .when(ingestionService).ingestDocument(any(), any());
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(testFile, testMetadata);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", errorMessage);
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file)
+                        .param("metadata", "test-metadata"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Document already exists"));
 
         System.out.println("✅ Тест ошибки загрузки документа пройден");
     }
 
-    /**
-     * Тест загрузки документа с общей ошибкой.
-     */
     @Test
     void testUploadDocument_WhenGeneralExceptionOccurs() throws Exception {
         // Arrange
-        String errorMessage = "Something went wrong";
-        doThrow(new RuntimeException(errorMessage))
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.txt",
+                "text/plain",
+                "Test content".getBytes()
+        );
+
+        doThrow(new RuntimeException("Something went wrong"))
                 .when(ingestionService).ingestDocument(any(), any());
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.uploadDocument(testFile, testMetadata);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", "Внутренняя ошибка сервера: " + errorMessage);
+        // Act & Assert
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file)
+                        .param("metadata", "test-metadata"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Внутренняя ошибка сервера: Something went wrong"));
 
         System.out.println("✅ Тест общей ошибки загрузки документа пройден");
     }
@@ -214,91 +172,61 @@ class DocumentApiControllerTest {
     // ТЕСТЫ ДЛЯ deleteDocument
     // ============================================================
 
-    /**
-     * Тест успешного удаления документа.
-     */
     @Test
-    void testDeleteDocument_Success() {
+    void testDeleteDocument_Success() throws Exception {
         // Arrange
         Long documentId = 1L;
         when(ingestionService.deleteDocument(documentId)).thenReturn(true);
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.deleteDocument(documentId);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("message", "Document deleted successfully")
-                .containsEntry("id", documentId);
-
-        verify(ingestionService).deleteDocument(documentId);
+        // Act & Assert
+        mockMvc.perform(delete("/api/documents/{id}", documentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Document deleted successfully"))
+                .andExpect(jsonPath("$.id").value(documentId));
 
         System.out.println("✅ Тест успешного удаления документа пройден");
     }
 
-    /**
-     * Тест удаления несуществующего документа.
-     */
     @Test
-    void testDeleteDocument_NotFound() {
+    void testDeleteDocument_NotFound() throws Exception {
         // Arrange
         Long documentId = 999L;
         when(ingestionService.deleteDocument(documentId)).thenReturn(false);
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.deleteDocument(documentId);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", "Документ с ID " + documentId + " не найден");
+        // Act & Assert
+        mockMvc.perform(delete("/api/documents/{id}", documentId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Документ с ID " + documentId + " не найден"));
 
         System.out.println("✅ Тест удаления несуществующего документа пройден");
     }
 
-    /**
-     * Тест удаления документа с исключением RuntimeException.
-     */
     @Test
-    void testDeleteDocument_WithRuntimeException() {
+    void testDeleteDocument_WithRuntimeException() throws Exception {
         // Arrange
         Long documentId = 1L;
         when(ingestionService.deleteDocument(documentId))
                 .thenThrow(new RuntimeException("Document not found"));
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.deleteDocument(documentId);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("error", "Документ с ID " + documentId + " не найден");
+        // Act & Assert
+        mockMvc.perform(delete("/api/documents/{id}", documentId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Документ с ID " + documentId + " не найден"));
 
         System.out.println("✅ Тест удаления документа с RuntimeException пройден");
     }
 
-    /**
-     * Тест удаления документа с общей ошибкой.
-     */
     @Test
-    void testDeleteDocument_WithGeneralException() {
+    void testDeleteDocument_WithGeneralException() throws Exception {
         // Arrange
         Long documentId = 1L;
         when(ingestionService.deleteDocument(documentId))
                 .thenThrow(new IllegalStateException("Database error"));
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.deleteDocument(documentId);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsKey("error");
+        // Act & Assert
+        mockMvc.perform(delete("/api/documents/{id}", documentId))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Ошибка удаления: Database error"));
 
         System.out.println("✅ Тест удаления документа с общей ошибкой пройден");
     }
@@ -307,68 +235,50 @@ class DocumentApiControllerTest {
     // ТЕСТЫ ДЛЯ documentExists
     // ============================================================
 
-    /**
-     * Тест проверки существования документа (существует).
-     */
     @Test
-    void testDocumentExists_WhenExists() {
+    void testDocumentExists_WhenExists() throws Exception {
         // Arrange
         String fileName = "test.txt";
         when(ingestionService.documentExists(fileName)).thenReturn(true);
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.documentExists(fileName);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("fileName", fileName)
-                .containsEntry("exists", true);
+        // Act & Assert
+        mockMvc.perform(get("/api/documents/exists")
+                        .param("fileName", fileName))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileName").value(fileName))
+                .andExpect(jsonPath("$.exists").value(true));
 
         System.out.println("✅ Тест проверки существования документа (true) пройден");
     }
 
-    /**
-     * Тест проверки существования документа (не существует).
-     */
     @Test
-    void testDocumentExists_WhenNotExists() {
+    void testDocumentExists_WhenNotExists() throws Exception {
         // Arrange
         String fileName = "nonexistent.txt";
         when(ingestionService.documentExists(fileName)).thenReturn(false);
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.documentExists(fileName);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsEntry("fileName", fileName)
-                .containsEntry("exists", false);
+        // Act & Assert
+        mockMvc.perform(get("/api/documents/exists")
+                        .param("fileName", fileName))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileName").value(fileName))
+                .andExpect(jsonPath("$.exists").value(false));
 
         System.out.println("✅ Тест проверки существования документа (false) пройден");
     }
 
-    /**
-     * Тест проверки существования документа с ошибкой.
-     */
     @Test
-    void testDocumentExists_WithException() {
+    void testDocumentExists_WithException() throws Exception {
         // Arrange
         String fileName = "test.txt";
         when(ingestionService.documentExists(fileName))
                 .thenThrow(new RuntimeException("Database error"));
 
-        // Act
-        ResponseEntity<Map<String, Object>> response = controller.documentExists(fileName);
-
-        // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody())
-                .isNotNull()
-                .containsKey("error");
+        // Act & Assert
+        mockMvc.perform(get("/api/documents/exists")
+                        .param("fileName", fileName))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Ошибка проверки: Database error"));
 
         System.out.println("✅ Тест проверки существования документа с ошибкой пройден");
     }

@@ -1,4 +1,4 @@
-package com.example.rag.controller;
+package com.example.rag.controller.web;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -8,7 +8,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
-import com.example.rag.controller.web.DocumentController;
 import com.example.rag.exception.DocumentIngestionException;
 import com.example.rag.service.DocumentIngestionService;
 import io.qameta.allure.Description;
