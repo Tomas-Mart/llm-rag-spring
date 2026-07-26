@@ -2,8 +2,6 @@ package com.example.rag.integration;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,7 +11,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import com.example.rag.service.DocumentIngestionService;
 import com.example.rag.service.RagService;
-import com.example.rag.support.BaseIntegrationTest;
+import com.example.rag.support.BaseIntegrationTestWithContainers;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -21,6 +19,7 @@ import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import io.qameta.allure.Story;
 import io.qameta.allure.TmsLink;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -35,39 +34,61 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Интеграционный тест для проверки работы контроллеров.
- * Проверяет полный цикл работы приложения: загрузка документа, задание вопроса, отображение страниц.
+ *
+ * <h2>Назначение</h2>
+ * <p>Проверяет REST API эндпоинты контроллеров через MockMvc.
+ * Все внешние зависимости замоканы для изоляции тестов.</p>
+ *
+ * <h2>Тестируемые сценарии</h2>
+ * <ul>
+ *   <li>Полный поток пользователя (загрузка → вопрос → результат)</li>
+ *   <li>Загрузка пустого файла</li>
+ *   <li>Задание вопроса без документа</li>
+ *   <li>Множественные вопросы</li>
+ *   <li>Доступность главной страницы</li>
+ *   <li>Загрузка с неверным типом файла</li>
+ *   <li>Удаление документа</li>
+ * </ul>
+ *
+ * <h2>Особенности</h2>
+ * <ul>
+ *   <li>Использует {@link AutoConfigureMockMvc} для настройки MockMvc</li>
+ *   <li>Все аннотации наследуются от {@link BaseIntegrationTestWithContainers}</li>
+ *   <li>Для логирования используется Lombok {@code @Slf4j}</li>
+ * </ul>
  *
  * @author RAG Application Team
- * @version 2.0
+ * @version 5.0
+ * @see BaseIntegrationTestWithContainers
+ * @see MockMvc
  * @since 1.0
  */
+@Slf4j
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
 @Epic("Интеграционные тесты")
 @Feature("Контроллеры")
-@MockitoSettings(strictness = Strictness.LENIENT)
-@SpringBootTest
-@AutoConfigureMockMvc
-class ControllerIntegrationTest extends BaseIntegrationTest {
+class ControllerIT extends BaseIntegrationTestWithContainers {
+
+    // ============================================================
+    // КОНСТАНТЫ
+    // ============================================================
+
+    private static final String SUPPORT_FILE_NAME = "support.txt";
+    private static final String TEST_CONTENT = "Spring AI is a framework for building AI applications.";
+    private static final String TEST_CONTENT_WITH_BOOT = "Spring AI is a framework for building AI applications with Spring Boot.";
+    private static final String METADATA = "support-metadata";
 
     // ============================================================
     // ЗАВИСИМОСТИ
     // ============================================================
 
-    /**
-     * MockMvc для выполнения HTTP запросов.
-     * Автоматически настраивается Spring Boot.
-     */
     @Autowired
     private MockMvc mockMvc;
 
-    /**
-     * Мок для DocumentIngestionService.
-     */
     @MockBean
     private DocumentIngestionService ingestionService;
 
-    /**
-     * Мок для RagService.
-     */
     @MockBean
     private RagService ragService;
 
@@ -75,19 +96,9 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     // ИНИЦИАЛИЗАЦИЯ
     // ============================================================
 
-    /**
-     * Настройка перед каждым тестом.
-     * Используем logger из BaseIntegrationTest для логирования.
-     */
     @BeforeEach
     void setUp() {
-        // Используем методы из BaseIntegrationTest
-        logTestStart("ControllerIntegrationTest initialization");
-
-        // Используем protected logger из BaseIntegrationTest
-        logger.info("   - MockMvc: {}", mockMvc != null ? "available" : "null");
-        logger.info("   - ingestionService: {}", ingestionService != null ? "available" : "null");
-        logger.info("   - ragService: {}", ragService != null ? "available" : "null");
+        log.info("🚀 [{}] ControllerIT initialized", getTestName());
     }
 
     // ============================================================
@@ -95,46 +106,37 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     // ============================================================
 
     @Test
-    @Description("Проверка полного цикла работы: загрузка документа → задание вопроса → отображение результата")
+    @Description("Проверка полного цикла работы: загрузка → вопрос → результат")
     @Story("Полный поток пользователя")
     @Severity(SeverityLevel.BLOCKER)
     @TmsLink("RAG-001")
     void testFullFlow() throws Exception {
         logTestStart("Testing full user flow");
 
-        // 1. Создаем файл для загрузки
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "support.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                "Spring AI is a framework for building AI applications.".getBytes()
-        );
-
-        // Мокаем метод ingestDocument - правильная сигнатура: (MultipartFile, String)
+        // 1. Загрузка документа
+        var file = createTextFile(SUPPORT_FILE_NAME, TEST_CONTENT);
         doNothing().when(ingestionService).ingestDocument(any(MockMultipartFile.class), anyString());
 
-        // Выполняем загрузку
         mockMvc.perform(multipart("/api/documents")
                         .file(file)
-                        .param("metadata", "support-metadata"))
+                        .param("metadata", METADATA))
                 .andExpect(status().isOk());
 
-        // 2. Задаем вопрос
-        String question = "What is Spring AI?";
-        String expectedAnswer = "Spring AI is a framework for building AI applications.";
-        when(ragService.ask(question)).thenReturn(expectedAnswer);
+        // 2. Задание вопроса
+        var question = "What is Spring AI?";
+        when(ragService.ask(question)).thenReturn(TEST_CONTENT);
 
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"question\":\"" + question + "\"}"))
                 .andExpect(status().isOk());
 
-        // 3. Проверяем главную страницу
+        // 3. Проверка главной страницы
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"));
 
-        logTestSuccess("Full user flow completed successfully");
+        logTestSuccess("Full user flow completed");
     }
 
     @Test
@@ -142,15 +144,10 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     @Story("Загрузка документов")
     @Severity(SeverityLevel.NORMAL)
     @TmsLink("RAG-002")
-    void testUploadDocumentWithEmptyFile() throws Exception {
+    void testUploadEmptyFile() throws Exception {
         logTestStart("Testing empty file upload");
 
-        MockMultipartFile emptyFile = new MockMultipartFile(
-                "file",
-                "empty.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                new byte[0]
-        );
+        var emptyFile = createTextFile("empty.txt", "");
 
         mockMvc.perform(multipart("/api/documents")
                         .file(emptyFile)
@@ -161,15 +158,15 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Description("Проверка задания вопроса без предварительной загрузки документа")
+    @Description("Проверка задания вопроса без документа")
     @Story("Работа с вопросами")
     @Severity(SeverityLevel.NORMAL)
     @TmsLink("RAG-003")
     void testAskQuestionWithoutDocument() throws Exception {
         logTestStart("Testing question without document");
 
-        String question = "What is RAG?";
-        String expectedAnswer = "RAG is Retrieval-Augmented Generation.";
+        var question = "What is RAG?";
+        var expectedAnswer = "RAG is Retrieval-Augmented Generation.";
         when(ragService.ask(question)).thenReturn(expectedAnswer);
 
         mockMvc.perform(post("/api/chat")
@@ -177,23 +174,19 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
                         .content("{\"question\":\"" + question + "\"}"))
                 .andExpect(status().isOk());
 
-        logTestSuccess("Question without document handled correctly");
+        logTestSuccess("Question without document handled");
     }
 
     @Test
-    @Description("Проверка загрузки документа и задания множественных вопросов")
+    @Description("Проверка загрузки документа и множественных вопросов")
     @Story("Множественные запросы")
     @Severity(SeverityLevel.CRITICAL)
     @TmsLink("RAG-004")
     void testUploadAndAskMultipleQuestions() throws Exception {
         logTestStart("Testing multiple questions");
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "support.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                "Spring AI is a framework for building AI applications with Spring Boot.".getBytes()
-        );
+        // Загрузка документа
+        var file = createTextFile(SUPPORT_FILE_NAME, TEST_CONTENT_WITH_BOOT);
         doNothing().when(ingestionService).ingestDocument(any(MockMultipartFile.class), anyString());
 
         mockMvc.perform(multipart("/api/documents")
@@ -201,17 +194,18 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
                         .param("metadata", "support"))
                 .andExpect(status().isOk());
 
-        String question1 = "What is Spring AI?";
-        String answer1 = "Spring AI is a framework for building AI applications.";
-        when(ragService.ask(question1)).thenReturn(answer1);
+        // Первый вопрос
+        var question1 = "What is Spring AI?";
+        when(ragService.ask(question1)).thenReturn(TEST_CONTENT);
 
         mockMvc.perform(post("/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"question\":\"" + question1 + "\"}"))
                 .andExpect(status().isOk());
 
-        String question2 = "What is Spring Boot?";
-        String answer2 = "Spring Boot is a framework for building microservices.";
+        // Второй вопрос
+        var question2 = "What is Spring Boot?";
+        var answer2 = "Spring Boot is a framework for building microservices.";
         when(ragService.ask(question2)).thenReturn(answer2);
 
         mockMvc.perform(post("/api/chat")
@@ -219,7 +213,7 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
                         .content("{\"question\":\"" + question2 + "\"}"))
                 .andExpect(status().isOk());
 
-        logTestSuccess("Multiple questions handled correctly");
+        logTestSuccess("Multiple questions handled");
     }
 
     @Test
@@ -245,7 +239,7 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     void testUploadInvalidFileType() throws Exception {
         logTestStart("Testing invalid file type upload");
 
-        MockMultipartFile file = new MockMultipartFile(
+        var file = new MockMultipartFile(
                 "file",
                 "document.exe",
                 "application/octet-stream",
@@ -257,7 +251,7 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
                         .param("metadata", "invalid-type"))
                 .andExpect(status().isBadRequest());
 
-        logTestSuccess("Invalid file type handled correctly");
+        logTestSuccess("Invalid file type handled");
     }
 
     @Test
@@ -268,14 +262,33 @@ class ControllerIntegrationTest extends BaseIntegrationTest {
     void testDeleteDocument() throws Exception {
         logTestStart("Testing document deletion");
 
-        Long documentId = 1L;
+        var documentId = 1L;
 
-        // Мокаем удаление через reIngestDocument
         doNothing().when(ingestionService).reIngestDocument(any(MockMultipartFile.class), anyString());
 
         mockMvc.perform(delete("/api/documents/{id}", documentId))
                 .andExpect(status().isOk());
 
-        logTestSuccess("Document deletion works correctly");
+        logTestSuccess("Document deletion works");
+    }
+
+    // ============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    /**
+     * Создает текстовый файл для тестирования.
+     *
+     * @param fileName имя файла
+     * @param content  содержимое файла
+     * @return MockMultipartFile
+     */
+    private MockMultipartFile createTextFile(String fileName, String content) {
+        return new MockMultipartFile(
+                "file",
+                fileName,
+                MediaType.TEXT_PLAIN_VALUE,
+                content.getBytes()
+        );
     }
 }

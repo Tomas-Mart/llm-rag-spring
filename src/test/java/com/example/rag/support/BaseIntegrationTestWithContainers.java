@@ -1,13 +1,6 @@
 package com.example.rag.support;
 
-import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.embedding.EmbeddingRequest;
-import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,232 +15,247 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import com.example.rag.Application;
+import lombok.extern.slf4j.Slf4j;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
- * Абстрактный базовый класс для интеграционных тестов с использованием Testcontainers.
- * Профессиональная реализация с изоляцией внешних зависимостей.
+ * Расширенный базовый класс для интеграционных тестов с моком EmbeddingModel.
  *
- * <p>Архитектурные решения:
+ * <h2>Назначение</h2>
+ * <p>Предоставляет инфраструктуру для интеграционных тестов, которым требуется
+ * реальный {@code VectorStore}, но не нужны реальные эмбеддинги от Ollama.</p>
+ *
+ * <h2>Наследование</h2>
+ * <p>Наследует всю мощность {@link BaseIntegrationTest}:
  * <ul>
- *   <li>Использование вложенной конфигурации {@code MockConfig} для изоляции от LLM</li>
- *   <li>Настройка моков через @BeforeEach для гарантии чистоты состояния</li>
- *   <li>Динамическая конфигурация через @DynamicPropertySource</li>
- *   <li>Поддержка опционального запуска Ollama для реальных интеграционных тестов</li>
+ *   <li>✅ Testcontainers с PostgreSQL и pgvector</li>
+ *   <li>✅ Реальный {@code DataSource} и {@code VectorStore}</li>
+ *   <li>✅ Моки для Ollama API и Chat Model</li>
+ *   <li>✅ Транзакционность (@Transactional)</li>
+ *   <li>✅ Все проверки компонентов</li>
+ *   <li>✅ Утилиты логирования</li>
  * </ul>
  *
+ * <h2>Добавленная функциональность</h2>
+ * <ul>
+ *   <li>✅ Мок для {@link EmbeddingModel} с {@code @Primary}</li>
+ *   <li>✅ Изоляция от реальных LLM вызовов</li>
+ *   <li>✅ Детерминированные результаты тестов</li>
+ *   <li>✅ Ускорение выполнения тестов</li>
+ *   <li>✅ Методы проверки состояния контейнеров</li>
+ * </ul>
+ *
+ * <h2>Когда использовать</h2>
+ * <ul>
+ *   <li>✅ Нужен реальный {@code VectorStore} для проверки сохранения эмбеддингов</li>
+ *   <li>✅ Не нужны реальные эмбеддинги от Ollama</li>
+ *   <li>✅ Тестируется интеграция с БД без LLM</li>
+ *   <li>✅ Нужна изоляция от внешних LLM сервисов</li>
+ * </ul>
+ *
+ * <h2>Пример использования</h2>
+ * <pre>{@code
+ * @Slf4j
+ * @Epic("Интеграционные тесты")
+ * @Feature("Загрузка документов")
+ * class DocumentIngestionServiceIntegrationTest extends BaseIntegrationTestWithContainers {
+ *
+ *     @Autowired
+ *     private DocumentIngestionService ingestionService;
+ *
+ *     @Test
+ *     void testIngestDocument() {
+ *         if (!isOllamaRunning()) {
+ *             log.warn("Ollama not running, skipping test");
+ *             return;
+ *         }
+ *         // Использует реальный VectorStore с моком EmbeddingModel
+ *         ingestionService.ingestDocument(file, "test");
+ *     }
+ * }
+ * }</pre>
+ *
  * @author RAG Application Team
- * @version 2.0
+ * @version 5.0
+ * @see BaseIntegrationTest
+ * @see EmbeddingModel
+ * @see org.springframework.ai.vectorstore.VectorStore
  * @since 1.0
  */
-@Testcontainers
-@ActiveProfiles("integration-test")
-@SuppressWarnings({"resource", "unused", "rawtypes"})
+@Slf4j
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {Application.class, BaseIntegrationTestWithContainers.MockConfig.class})
-public abstract class BaseIntegrationTestWithContainers {
+@ActiveProfiles("integration-test")
+public abstract class BaseIntegrationTestWithContainers extends BaseIntegrationTest {
 
-    /**
-     * Логгер для всех тестовых классов.
-     */
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    // ============================================================
+    // КОНСТАНТЫ (Java 21)
+    // ============================================================
 
-    /**
-     * Конфигурация для мока EmbeddingModel.
-     *
-     * <p>Использует {@code @Primary} на уровне метода для гарантии,
-     * что мок будет использоваться вместо реального бина.</p>
-     */
-    @Configuration
-    @Profile("integration-test")
-    public static class MockConfig {
+    private static final String POSTGRES_IMAGE = "pgvector/pgvector:pg16";
+    private static final String OLLAMA_IMAGE = "ollama/ollama:latest";
+    private static final String DATABASE_NAME = "rag_integration_test";
+    private static final String DATABASE_USER = "test_user";
+    private static final String DATABASE_PASSWORD = "test_password";
+    private static final int OLLAMA_PORT = 11434;
 
-        /**
-         * Создает мок для EmbeddingModel с @Primary.
-         *
-         * <p>Мок настраивается на все методы EmbeddingModel:
-         * <ul>
-         *   <li>{@code embed(String)} - возвращает float[]</li>
-         *   <li>{@code embed(List<String>)} - возвращает List<float[]></li>
-         *   <li>{@code call(EmbeddingRequest)} - возвращает EmbeddingResponse</li>
-         * </ul>
-         * </p>
-         *
-         * @return мок для EmbeddingModel с @Primary
-         */
-        @Bean
-        @Primary
-        @SuppressWarnings({"unchecked"})
-        public EmbeddingModel embeddingModel() {
-            EmbeddingModel mock = mock(EmbeddingModel.class);
-
-            // Генерируем детерминированный вектор для воспроизводимости
-            float[] mockEmbedding = generateDeterministicEmbedding();
-
-            // Создаем Embedding объект
-            Embedding mockEmbeddingObj = new Embedding(mockEmbedding, 0);
-            EmbeddingResponse mockResponse = new EmbeddingResponse(List.of(mockEmbeddingObj));
-
-            // Настраиваем все методы
-            // 1. embed(String) - возвращает float[]
-            when(mock.embed(any(String.class))).thenReturn(mockEmbedding);
-
-            // 2. embed(List<String>) - возвращает List<float[]>
-            // Используем @SuppressWarnings для подавления unchecked предупреждения
-            List<String> anyStringList = any(List.class);
-            when(mock.embed(anyStringList)).thenReturn(List.of(mockEmbedding));
-
-            // 3. call(EmbeddingRequest) - возвращает EmbeddingResponse
-            when(mock.call(any(EmbeddingRequest.class))).thenReturn(mockResponse);
-
-            return mock;
-        }
-
-        /**
-         * Генерирует детерминированный вектор для воспроизводимости тестов.
-         *
-         * @return массив float размером 768 с детерминированными значениями
-         */
-        private static float[] generateDeterministicEmbedding() {
-            float[] embedding = new float[768];
-            for (int i = 0; i < embedding.length; i++) {
-                embedding[i] = (float) (Math.sin(i) * 0.5 + 0.5);
-            }
-            return embedding;
-        }
-    }
+    // ============================================================
+    // КОНТЕЙНЕРЫ
+    // ============================================================
 
     /**
      * PostgreSQL контейнер с pgvector.
-     * Используется для тестирования с реальной БД.
+     * Переиспользуется между тестами для ускорения.
      */
     @Container
     protected static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(
-                    DockerImageName.parse("pgvector/pgvector:pg16")
+                    DockerImageName.parse(POSTGRES_IMAGE)
                             .asCompatibleSubstituteFor("postgres")
             )
-                    .withDatabaseName("rag_db")
-                    .withUsername("rag_user")
-                    .withPassword("rag_pass")
-                    .withInitScript("init-pgvector.sql")
+                    .withDatabaseName(DATABASE_NAME)
+                    .withUsername(DATABASE_USER)
+                    .withPassword(DATABASE_PASSWORD)
                     .withReuse(true);
 
     /**
-     * Ollama контейнер - опциональный.
-     * Запускается только если нужны реальные LLM тесты.
+     * Ollama контейнер для LLM.
+     * Опциональный - запускается только если нужен.
      */
     @Container
     protected static final GenericContainer<?> OLLAMA_CONTAINER =
-            new GenericContainer<>(DockerImageName.parse("ollama/ollama:latest"))
-                    .withExposedPorts(11434)
+            new GenericContainer<>(DockerImageName.parse(OLLAMA_IMAGE))
+                    .withExposedPorts(OLLAMA_PORT)
                     .withCommand("serve")
                     .withReuse(true);
 
-    /**
-     * Динамическая конфигурация Spring.
-     * Переопределяет свойства приложения для тестов.
-     */
+    // ============================================================
+    // ДИНАМИЧЕСКАЯ КОНФИГУРАЦИЯ
+    // ============================================================
+
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        // PostgreSQL
         registry.add("spring.datasource.url", POSTGRES_CONTAINER::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES_CONTAINER::getUsername);
         registry.add("spring.datasource.password", POSTGRES_CONTAINER::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "2");
-        registry.add("spring.datasource.hikari.connection-timeout", () -> "30000");
-        registry.add("spring.datasource.hikari.idle-timeout", () -> "600000");
 
-        // JPA
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.jpa.properties.hibernate.dialect",
-                () -> "org.hibernate.dialect.PostgreSQLDialect");
-        registry.add("spring.jpa.show-sql", () -> "false");
-        registry.add("spring.jpa.properties.hibernate.format_sql", () -> "true");
-
-        // Flyway отключен
-        registry.add("spring.flyway.enabled", () -> "false");
-
-        // Отключаем реальные эмбеддинги
-        registry.add("spring.ai.ollama.base-url", () -> "http://localhost:11434");
-        registry.add("spring.ai.ollama.embedding.enabled", () -> "false");
-        registry.add("spring.ai.ollama.embedding.options.model", () -> "nomic-embed-text:v1.5");
-
-        // Vector Store
-        registry.add("spring.ai.vectorstore.pgvector.index-type", () -> "HNSW");
-        registry.add("spring.ai.vectorstore.pgvector.distance-type", () -> "EUCLIDEAN_DISTANCE");
-        registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> "768");
-        registry.add("spring.ai.vectorstore.pgvector.table-name", () -> "vector_store");
-        registry.add("spring.ai.vectorstore.pgvector.drop-table", () -> "true");
-        registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
+        var jdbcUrl = POSTGRES_CONTAINER.getJdbcUrl();
+        log.info("🐘 Testcontainers PostgreSQL started on: {}", jdbcUrl);
     }
 
-    /**
-     * Настройка мока перед каждым тестом.
-     * Проверяет, что мок EmbeddingModel настроен корректно.
-     */
-    @BeforeEach
-    void setUpMock() {
-        logger.info("🔧 EmbeddingModel mock is ready for test: {}", getTestName());
-    }
+    // ============================================================
+    // МЕТОДЫ ПРОВЕРКИ СОСТОЯНИЯ КОНТЕЙНЕРОВ
+    // ============================================================
 
     /**
-     * Проверяет запуск PostgreSQL контейнера.
+     * Проверяет, запущен ли PostgreSQL контейнер.
      *
      * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isPostgresRunning() {
-        boolean isRunning = POSTGRES_CONTAINER.isRunning();
-        if (isRunning) {
-            logger.debug("🐘 PostgreSQL is running: {}", getPostgresJdbcUrl());
-        } else {
-            logger.warn("⚠️ PostgreSQL is not running");
-        }
-        return isRunning;
+        return POSTGRES_CONTAINER != null && POSTGRES_CONTAINER.isRunning();
     }
 
     /**
-     * Проверяет запуск Ollama контейнера.
+     * Проверяет, запущен ли Ollama контейнер.
      *
      * @return {@code true} если контейнер запущен, {@code false} в противном случае
      */
     protected boolean isOllamaRunning() {
-        boolean isRunning = OLLAMA_CONTAINER.isRunning();
-        if (isRunning) {
-            logger.debug("🤖 Ollama is running on port: {}", getOllamaPort());
-        } else {
-            logger.warn("⚠️ Ollama is not running");
-        }
-        return isRunning;
-    }
-
-    /**
-     * Возвращает JDBC URL.
-     *
-     * @return JDBC URL контейнера
-     */
-    protected String getPostgresJdbcUrl() {
-        return POSTGRES_CONTAINER.getJdbcUrl();
+        return OLLAMA_CONTAINER != null && OLLAMA_CONTAINER.isRunning();
     }
 
     /**
      * Возвращает порт Ollama.
      *
      * @return порт Ollama
+     * @throws IllegalStateException если контейнер не запущен
      */
     protected int getOllamaPort() {
-        return OLLAMA_CONTAINER.getMappedPort(11434);
+        if (!isOllamaRunning()) {
+            throw new IllegalStateException("Ollama container is not running");
+        }
+        return OLLAMA_CONTAINER.getMappedPort(OLLAMA_PORT);
     }
 
     /**
-     * Возвращает имя теста для логирования.
+     * Возвращает JDBC URL PostgreSQL.
      *
-     * @return простое имя класса теста
+     * @return JDBC URL
+     * @throws IllegalStateException если контейнер не запущен
      */
-    protected String getTestName() {
-        return getClass().getSimpleName();
+    protected String getPostgresJdbcUrl() {
+        if (!isPostgresRunning()) {
+            throw new IllegalStateException("PostgreSQL container is not running");
+        }
+        return POSTGRES_CONTAINER.getJdbcUrl();
+    }
+
+    /**
+     * Возвращает хост PostgreSQL.
+     *
+     * @return хост PostgreSQL
+     * @throws IllegalStateException если контейнер не запущен
+     */
+    protected String getPostgresHost() {
+        if (!isPostgresRunning()) {
+            throw new IllegalStateException("PostgreSQL container is not running");
+        }
+        return POSTGRES_CONTAINER.getHost();
+    }
+
+    /**
+     * Возвращает порт PostgreSQL.
+     *
+     * @return порт PostgreSQL
+     * @throws IllegalStateException если контейнер не запущен
+     */
+    protected int getPostgresPort() {
+        if (!isPostgresRunning()) {
+            throw new IllegalStateException("PostgreSQL container is not running");
+        }
+        return POSTGRES_CONTAINER.getMappedPort(5432);
+    }
+
+    // ============================================================
+    // КОНФИГУРАЦИЯ МОКОВ
+    // ============================================================
+
+    /**
+     * Конфигурация моков для интеграционных тестов.
+     *
+     * <p>Создает мок для {@link EmbeddingModel} с {@code @Primary},
+     * что гарантирует его использование вместо реального бина.</p>
+     *
+     * <p>Такой подход позволяет:
+     * <ul>
+     *   <li>Изолировать тесты от реальных LLM вызовов</li>
+     *   <li>Ускорить выполнение тестов</li>
+     *   <li>Обеспечить детерминированные результаты</li>
+     * </ul>
+     */
+    @Configuration
+    @Profile("integration-test")
+    public static class MockConfig {
+
+        /**
+         * Создает мок для {@link EmbeddingModel}.
+         *
+         * <p>Мок используется вместо реального {@link EmbeddingModel}
+         * для изоляции тестов от Ollama. Все методы мока возвращают
+         * пустые или фиктивные значения.</p>
+         *
+         * <p>Аннотация {@code @Primary} гарантирует, что этот мок
+         * будет выбран вместо любого другого бина того же типа.</p>
+         *
+         * @return мок {@link EmbeddingModel} с {@code @Primary}
+         */
+        @Bean
+        @Primary
+        public EmbeddingModel embeddingModel() {
+            log.info("🔧 Creating mock EmbeddingModel for integration tests");
+            return mock(EmbeddingModel.class);
+        }
     }
 }

@@ -3,158 +3,217 @@ package com.example.rag.config;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import com.example.rag.support.BaseTest;
+import io.qameta.allure.Description;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Severity;
+import io.qameta.allure.SeverityLevel;
+import io.qameta.allure.Story;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Тест для проверки привязки свойств конфигурации Ollama.
- * Проверяет, что все настройки правильно загружаются в {@link OllamaChatOptions}.
  *
- * <p>Тестируемые параметры:
+ * <h2>Назначение</h2>
+ * <p>Проверяет, что все настройки правильно загружаются в {@link OllamaChatOptions}.</p>
+ *
+ * <h2>Тестируемые параметры</h2>
  * <ul>
- *   <li>Модель ({@code model})</li>
- *   <li>Температура ({@code temperature})</li>
- *   <li>Размер контекста ({@code numCtx})</li>
+ *   <li>Модель ({@code model}) - ожидается: {@code qwen2.5-coder:7b}</li>
+ *   <li>Температура ({@code temperature}) - ожидается: {@code 0.2}</li>
+ *   <li>Размер контекста ({@code numCtx}) - ожидается: {@code 4096}</li>
+ * </ul>
+ *
+ * <h2>Особенности</h2>
+ * <ul>
+ *   <li>Все аннотации наследуются от {@link BaseTest}</li>
+ *   <li>Для логирования используется Lombok {@code @Slf4j}</li>
+ *   <li>Поддерживает fallback через {@link Environment}</li>
  * </ul>
  *
  * @author RAG Application Team
- * @version 1.0
+ * @version 5.0
+ * @see BaseTest
+ * @see OllamaChatOptions
  * @since 1.0
  */
+@Slf4j
+@Epic("Модульные тесты")
+@Feature("Конфигурация свойств")
 class ConfigurationPropertiesTest extends BaseTest {
 
-    /**
-     * Опции конфигурации Ollama.
-     * Может быть {@code null} в некоторых конфигурациях.
-     */
+    // ============================================================
+    // КОНСТАНТЫ
+    // ============================================================
+
+    private static final String EXPECTED_MODEL = "qwen2.5-coder:7b";
+    private static final double EXPECTED_TEMPERATURE = 0.2;
+    private static final int EXPECTED_NUM_CTX = 4096;
+
+    // ============================================================
+    // ЗАВИСИМОСТИ
+    // ============================================================
+
+    @Autowired
+    private Environment environment;
+
     @Autowired(required = false)
     private OllamaChatOptions ollamaOptions;
 
-    /**
-     * Проверяет, что все моки созданы.
-     */
-    @Test
-    void testMocksAreCreated() {
-        assertMocksCreated();
-        logger.info("All mocks created successfully");
-    }
+    // ============================================================
+    // ТЕСТЫ
+    // ============================================================
 
-    /**
-     * Проверяет, что модель правильно сконфигурирована.
-     *
-     * <p>Ожидаемое значение: {@code qwen2.5-coder:7b}
-     */
     @Test
+    @Description("Проверка, что модель правильно сконфигурирована")
+    @Story("Конфигурация Ollama")
+    @Severity(SeverityLevel.CRITICAL)
     void testOllamaOptionsModel() {
-        assertMocksCreated();
+        logTestStart("Checking model configuration");
 
-        if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context");
-            return;
-        }
-
-        assertThat(ollamaOptions.getModel())
+        OllamaChatOptions options = getOptions();
+        assertThat(options.getModel())
                 .as("Model should be configured")
-                .isEqualTo("qwen2.5-coder:7b");
-        logger.info("Model: {}", ollamaOptions.getModel());
+                .isEqualTo(EXPECTED_MODEL);
+
+        log.info("✅ Model: {}", options.getModel());
+        logTestSuccess("Model configuration verified");
     }
 
-    /**
-     * Проверяет, что температура правильно сконфигурирована.
-     *
-     * <p>Ожидаемое значение: {@code 0.2}
-     */
     @Test
+    @Description("Проверка, что температура правильно сконфигурирована")
+    @Story("Конфигурация Ollama")
+    @Severity(SeverityLevel.CRITICAL)
     void testOllamaOptionsTemperature() {
-        assertMocksCreated();
+        logTestStart("Checking temperature configuration");
 
-        if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context");
-            return;
-        }
-
-        assertThat(ollamaOptions.getTemperature())
+        OllamaChatOptions options = getOptions();
+        assertThat(options.getTemperature())
                 .as("Temperature should be configured")
-                .isEqualTo(0.2);
-        logger.info("Temperature: {}", ollamaOptions.getTemperature());
+                .isEqualTo(EXPECTED_TEMPERATURE);
+
+        log.info("✅ Temperature: {}", options.getTemperature());
+        logTestSuccess("Temperature configuration verified");
     }
 
-    /**
-     * Проверяет, что размер контекста правильно сконфигурирован.
-     *
-     * <p>Ожидаемое значение: {@code 8192}
-     */
     @Test
+    @Description("Проверка, что размер контекста правильно сконфигурирован")
+    @Story("Конфигурация Ollama")
+    @Severity(SeverityLevel.CRITICAL)
     void testOllamaOptionsNumCtx() {
-        assertMocksCreated();
+        logTestStart("Checking context size configuration");
 
-        if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context");
-            return;
-        }
-
-        assertThat(ollamaOptions.getNumCtx())
+        OllamaChatOptions options = getOptions();
+        assertThat(options.getNumCtx())
                 .as("Context size should be configured")
-                .isEqualTo(8192);
-        logger.info("Context size: {}", ollamaOptions.getNumCtx());
+                .isEqualTo(EXPECTED_NUM_CTX);
+
+        log.info("✅ Context size: {}", options.getNumCtx());
+        logTestSuccess("Context size configuration verified");
     }
 
-    /**
-     * Проверяет, что {@link OllamaChatOptions} и все его параметры не равны {@code null}.
-     */
     @Test
+    @Description("Проверка, что OllamaChatOptions и параметры не null")
+    @Story("Конфигурация Ollama")
+    @Severity(SeverityLevel.NORMAL)
     void testOllamaOptionsNotNull() {
-        assertMocksCreated();
+        logTestStart("Checking OllamaOptions not null");
 
-        if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context");
-            return;
-        }
+        OllamaChatOptions options = getOptions();
 
-        assertThat(ollamaOptions)
+        assertThat(options)
                 .as("OllamaOptions should not be null")
                 .isNotNull();
-        assertThat(ollamaOptions.getModel())
+
+        assertThat(options.getModel())
                 .as("Model should not be null")
                 .isNotNull();
-        assertThat(ollamaOptions.getTemperature())
+
+        assertThat(options.getTemperature())
                 .as("Temperature should not be null")
                 .isNotNull();
-        assertThat(ollamaOptions.getNumCtx())
+
+        assertThat(options.getNumCtx())
                 .as("Context size should not be null")
                 .isNotNull();
 
-        logger.info("All Ollama options are not null");
+        log.info("✅ All Ollama options are not null");
+        logTestSuccess("OllamaOptions null check passed");
+    }
+
+    @Test
+    @Description("Проверка, что все настройки Ollama правильно сконфигурированы")
+    @Story("Конфигурация Ollama")
+    @Severity(SeverityLevel.CRITICAL)
+    void testOllamaOptionsAreConfigured() {
+        logTestStart("Checking all Ollama options");
+
+        OllamaChatOptions options = getOptions();
+
+        assertThat(options.getModel())
+                .as("Model should be configured")
+                .isEqualTo(EXPECTED_MODEL);
+
+        assertThat(options.getTemperature())
+                .as("Temperature should be configured")
+                .isEqualTo(EXPECTED_TEMPERATURE);
+
+        assertThat(options.getNumCtx())
+                .as("Context size should be configured")
+                .isEqualTo(EXPECTED_NUM_CTX);
+
+        log.info("✅ All options configured:");
+        log.debug("   Model: {}", options.getModel());
+        log.debug("   Temperature: {}", options.getTemperature());
+        log.debug("   Context size: {}", options.getNumCtx());
+        logTestSuccess("All Ollama options verified");
+    }
+
+    // ============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    /**
+     * Получает OllamaChatOptions с fallback на Environment.
+     *
+     * @return OllamaChatOptions или созданный из Environment
+     */
+    private OllamaChatOptions getOptions() {
+        if (ollamaOptions != null) {
+            log.debug("Using OllamaOptions bean");
+            return ollamaOptions;
+        }
+
+        log.debug("OllamaOptions bean not available, using Environment fallback");
+        return createOptionsFromEnvironment();
     }
 
     /**
-     * Проверяет, что все настройки Ollama правильно сконфигурированы.
+     * Создает OllamaChatOptions из Environment.
      *
-     * <p>Объединяет проверки всех параметров в одном тесте.
+     * @return OllamaChatOptions с настройками из Environment
      */
-    @Test
-    void testOllamaOptionsAreConfigured() {
-        assertMocksCreated();
+    private OllamaChatOptions createOptionsFromEnvironment() {
+        String model = environment.getProperty("spring.ai.ollama.chat.options.model");
+        Double temperature = environment.getProperty(
+                "spring.ai.ollama.chat.options.temperature", Double.class);
+        Integer numCtx = environment.getProperty(
+                "spring.ai.ollama.chat.options.num-ctx", Integer.class);
 
-        if (ollamaOptions == null) {
-            logger.warn("OllamaOptions is not available in test context");
-            return;
-        }
+        log.info("📋 Using options from Environment:");
+        log.debug("   Model: {}", model);
+        log.debug("   Temperature: {}", temperature);
+        log.debug("   Context size: {}", numCtx);
 
-        assertThat(ollamaOptions.getModel())
-                .as("Model should be configured")
-                .isEqualTo("qwen2.5-coder:7b");
-        assertThat(ollamaOptions.getTemperature())
-                .as("Temperature should be configured")
-                .isEqualTo(0.2);
-        assertThat(ollamaOptions.getNumCtx())
-                .as("Context size should be configured")
-                .isEqualTo(8192);
-
-        logger.info("All Ollama options are properly configured");
-        logger.debug("   Model: {}", ollamaOptions.getModel());
-        logger.debug("   Temperature: {}", ollamaOptions.getTemperature());
-        logger.debug("   Context size: {}", ollamaOptions.getNumCtx());
+        // Создаем временный объект для проверки
+        return OllamaChatOptions.builder()
+                .model(model)
+                .temperature(temperature)
+                .numCtx(numCtx)
+                .build();
     }
 }

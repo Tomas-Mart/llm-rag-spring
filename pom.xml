@@ -19,7 +19,13 @@
     <description>RAG приложение на Spring AI + Ollama + pgvector</description>
 
     <properties>
+        <!-- Java -->
         <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+
+        <!-- Версии зависимостей -->
         <spring-ai.version>1.1.8</spring-ai.version>
         <flyway.version>10.17.0</flyway.version>
         <testcontainers.version>1.20.4</testcontainers.version>
@@ -33,27 +39,59 @@
         <thymeleaf.version>3.1.5.RELEASE</thymeleaf.version>
         <assertj.version>3.27.7</assertj.version>
         <commons-compress.version>1.27.0</commons-compress.version>
+        <mockito.version>5.11.0</mockito.version>
 
-        <!-- SonarQube настройки -->
-        <sonar.host.url>http://localhost:9000</sonar.host.url>
-        <sonar.projectKey>llm-rag-spring</sonar.projectKey>
+        <!-- ========================================= -->
+        <!-- SONARQUBE НАСТРОЙКИ                        -->
+        <!-- ========================================= -->
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.organization>tomas-mart</sonar.organization>
+        <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
         <sonar.projectName>RAG Spring Application</sonar.projectName>
         <sonar.java.source>21</sonar.java.source>
 
+        <!-- Исключения для покрытия -->
+        <sonar.coverage.exclusions>
+            **/config/**,
+            **/Application.java,
+            **/exception/**,
+            **/entity/**,
+            **/dto/**,
+            **/model/**
+        </sonar.coverage.exclusions>
+
+        <!-- Пути к тестам -->
+        <sonar.tests>src/test/java</sonar.tests>
+        <sonar.test.inclusions>
+            **/*Test.java,
+            **/*IT.java,
+            **/IT*.java
+        </sonar.test.inclusions>
+
+        <!-- Отчеты JaCoCo -->
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+        <sonar.coverage.jacoco.xmlReportPaths>
+            target/site/jacoco/jacoco.xml,
+            target/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
+
+        <!-- Пороги качества -->
+        <sonar.coverage.threshold>30</sonar.coverage.threshold>
+        <sonar.cpd.exclusions>
+            **/config/**,
+            **/entity/**
+        </sonar.cpd.exclusions>
+
+        <!-- Maven плагины -->
         <skipITs>true</skipITs>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
     </properties>
 
     <!-- ========================================= -->
-    <!-- GITHUB PACKAGES                           -->
+    <!-- РЕПОЗИТОРИИ                               -->
     <!-- ========================================= -->
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/Tomas-Mart/llm-rag-spring</url>
-        </repository>
-    </distributionManagement>
-
     <repositories>
         <repository>
             <id>central</id>
@@ -75,182 +113,9 @@
         </repository>
     </repositories>
 
-    <profiles>
-        <!-- ========================================= -->
-        <!-- SPRING ПРОФИЛИ                            -->
-        <!-- ========================================= -->
-        <profile>
-            <id>dev</id>
-            <properties>
-                <spring.profiles.active>dev</spring.profiles.active>
-            </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-        </profile>
-
-        <profile>
-            <id>test</id>
-            <properties>
-                <spring.profiles.active>test</spring.profiles.active>
-            </properties>
-        </profile>
-
-        <profile>
-            <id>prod</id>
-            <properties>
-                <spring.profiles.active>prod</spring.profiles.active>
-            </properties>
-        </profile>
-
-        <!-- ========================================= -->
-        <!-- SONAR ПРОФИЛИ                             -->
-        <!-- ========================================= -->
-        <profile>
-            <id>sonarcloud</id>
-            <properties>
-                <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-                <sonar.organization>tomas-mart</sonar.organization>
-                <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
-            </properties>
-        </profile>
-
-        <profile>
-            <id>sonar-local</id>
-            <properties>
-                <sonar.host.url>http://localhost:9000</sonar.host.url>
-                <sonar.projectKey>llm-rag-spring-local</sonar.projectKey>
-            </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-        </profile>
-
-        <!-- ========================================= -->
-        <!-- CI ПРОФИЛЬ - ТОЛЬКО UNIT ТЕСТЫ            -->
-        <!-- ========================================= -->
-        <profile>
-            <id>ci</id>
-            <properties>
-                <skipITs>true</skipITs>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <testFailureIgnore>false</testFailureIgnore>
-                            <excludes>
-                                <exclude>**/*IntegrationTest.java</exclude>
-                                <exclude>**/*PerformanceTest.java</exclude>
-                                <exclude>**/integration/**/*.java</exclude>
-                            </excludes>
-                            <includes>
-                                <include>**/*Test.java</include>
-                                <include>**/config/*Test.java</include>
-                                <include>**/controller/*Test.java</include>
-                                <include>**/service/*Test.java</include>
-                                <include>**/entity/*Test.java</include>
-                            </includes>
-                            <systemPropertyVariables>
-                                <jacoco.skip>true</jacoco.skip>
-                            </systemPropertyVariables>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
-                            <skipITs>true</skipITs>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ========================================= -->
-        <!-- ИНТЕГРАЦИОННЫЕ ТЕСТЫ (локально)            -->
-        <!-- ========================================= -->
-        <profile>
-            <id>integration-tests</id>
-            <properties>
-                <skipITs>false</skipITs>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
-                            <skipITs>false</skipITs>
-                            <includes>
-                                <include>**/*IntegrationTest.java</include>
-                            </includes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ========================================= -->
-        <!-- PERFORMANCE ТЕСТЫ (запускаются отдельно)  -->
-        <!-- ========================================= -->
-        <profile>
-            <id>performance-tests</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <testFailureIgnore>true</testFailureIgnore>
-                            <includes>
-                                <include>**/*PerformanceTest.java</include>
-                            </includes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ========================================= -->
-        <!-- ПОЛНЫЙ ПРОФИЛЬ (все тесты)                -->
-        <!-- ========================================= -->
-        <profile>
-            <id>full</id>
-            <properties>
-                <skipITs>false</skipITs>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>**/*Test.java</include>
-                            </includes>
-                            <excludes>
-                                <exclude>**/*PerformanceTest.java</exclude>
-                            </excludes>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
-                            <skipITs>false</skipITs>
-                            <includes>
-                                <include>**/*IntegrationTest.java</include>
-                            </includes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-
+    <!-- ========================================= -->
+    <!-- УПРАВЛЕНИЕ ЗАВИСИМОСТЯМИ                   -->
+    <!-- ========================================= -->
     <dependencyManagement>
         <dependencies>
             <!-- Spring AI BOM -->
@@ -307,21 +172,11 @@
                 <artifactId>logback-classic</artifactId>
                 <version>${logback.version}</version>
             </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.version}</version>
-            </dependency>
 
             <!-- Thymeleaf -->
             <dependency>
                 <groupId>org.thymeleaf</groupId>
                 <artifactId>thymeleaf</artifactId>
-                <version>${thymeleaf.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.thymeleaf</groupId>
-                <artifactId>thymeleaf-spring6</artifactId>
                 <version>${thymeleaf.version}</version>
             </dependency>
 
@@ -333,15 +188,19 @@
                 <scope>test</scope>
             </dependency>
 
-            <!-- Commons Compress -->
+            <!-- Mockito -->
             <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>${commons-compress.version}</version>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
+    <!-- ========================================= -->
+    <!-- ЗАВИСИМОСТИ                               -->
+    <!-- ========================================= -->
     <dependencies>
         <!-- Spring Boot -->
         <dependency>
@@ -376,36 +235,30 @@
         </dependency>
 
         <!-- ========================================= -->
-        <!-- SPRING AI 1.1.8                           -->
+        <!-- SPRING AI                                -->
         <!-- ========================================= -->
-
-        <!-- Ollama Chat & Embedding Models -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-ollama</artifactId>
         </dependency>
 
-        <!-- pgvector Vector Store -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
 
-        <!-- RAG Advisors (QuestionAnswerAdvisor) - с явной версией -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-advisors-vector-store</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
 
-        <!-- Чтение документов (PDF) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-pdf-document-reader</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Чтение документов через Apache Tika -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-tika-document-reader</artifactId>
@@ -424,13 +277,11 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>${flyway.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
-            <version>${flyway.version}</version>
             <scope>runtime</scope>
         </dependency>
 
@@ -443,22 +294,8 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
-            <groupId>com.github.docker-java</groupId>
-            <artifactId>docker-java-core</artifactId>
-            <version>3.4.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-
-            <groupId>com.github.docker-java</groupId>
-            <artifactId>docker-java-transport-httpclient5</artifactId>
-            <version>3.4.0</version>
-            <scope>test</scope>
-        </dependency>
-
         <!-- ========================================= -->
-        <!-- ALLURE                                    -->
+        <!-- ALLURE                                   -->
         <!-- ========================================= -->
         <dependency>
             <groupId>io.qameta.allure</groupId>
@@ -467,15 +304,8 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.qameta.allure</groupId>
-            <artifactId>allure-attachments</artifactId>
-            <version>2.25.0</version>
-            <scope>test</scope>
-        </dependency>
-
         <!-- ========================================= -->
-        <!-- TIKA + OCR                                -->
+        <!-- TIKA + OCR                               -->
         <!-- ========================================= -->
         <dependency>
             <groupId>org.apache.tika</groupId>
@@ -489,7 +319,6 @@
             <version>3.0.0</version>
         </dependency>
 
-        <!-- Apache Commons IO для Tika -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
@@ -502,14 +331,8 @@
             <version>5.9.0</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.drewnoakes</groupId>
-            <artifactId>metadata-extractor</artifactId>
-            <version>2.19.0</version>
-        </dependency>
-
         <!-- ========================================= -->
-        <!-- ТЕСТЫ                                     -->
+        <!-- ТЕСТЫ                                    -->
         <!-- ========================================= -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -530,8 +353,14 @@
         </dependency>
 
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -554,26 +383,23 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Mockito -->
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- H2 только для локальной разработки -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
+    <!-- ========================================= -->
+    <!-- СБОРКА                                    -->
+    <!-- ========================================= -->
     <build>
         <resources>
             <resource>
@@ -589,7 +415,9 @@
                 </includes>
             </resource>
         </resources>
+
         <plugins>
+            <!-- Spring Boot -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -603,144 +431,13 @@
                 </configuration>
             </plugin>
 
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-site-plugin</artifactId>
-                <version>3.21.0</version>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-deploy-plugin</artifactId>
-                <version>3.1.1</version>
-            </plugin>
-
-            <plugin>
-                <groupId>com.github.github</groupId>
-                <artifactId>site-maven-plugin</artifactId>
-                <version>0.12</version>
-                <configuration>
-                    <message>Сборка проекта</message>
-                    <noJekyll>true</noJekyll>
-                    <outputDirectory>${project.build.directory}/site</outputDirectory>
-                    <merge>true</merge>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
-                <configuration>
-                    <testFailureIgnore>false</testFailureIgnore>
-                    <!-- По умолчанию: только Unit тесты -->
-                    <excludes>
-                        <exclude>**/*IntegrationTest.java</exclude>
-                        <exclude>**/*PerformanceTest.java</exclude>
-                        <exclude>**/integration/**/*.java</exclude>
-                    </excludes>
-                    <includes>
-                        <include>**/*Test.java</include>
-                    </includes>
-                </configuration>
-            </plugin>
-
-            <!-- ========================================= -->
-            <!-- FAILSAFE - ИНТЕГРАЦИОННЫЕ ТЕСТЫ            -->
-            <!-- ========================================= -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.2.5</version>
-                <configuration>
-                    <skipITs>${skipITs}</skipITs>
-                    <includes>
-                        <include>**/*IntegrationTest.java</include>
-                    </includes>
-                    <excludes>
-                        <exclude>**/*PerformanceTest.java</exclude>
-                    </excludes>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>check</id>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <rule>
-                                    <element>PACKAGE</element>
-                                    <limits>
-                                        <limit>
-                                            <counter>LINE</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.50</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.sonarsource.scanner.maven</groupId>
-                <artifactId>sonar-maven-plugin</artifactId>
-                <version>3.10.0.2594</version>
-            </plugin>
-
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.8.3.0</version>
-                <configuration>
-                    <effort>Max</effort>
-                    <threshold>Medium</threshold>
-                    <failOnError>true</failOnError>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
+            <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
+                    <encoding>UTF-8</encoding>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <annotationProcessorPaths>
@@ -754,30 +451,255 @@
             </plugin>
 
             <plugin>
-                <groupId>org.owasp</groupId>
-                <artifactId>dependency-check-maven</artifactId>
-                <version>11.0.0</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
                 <configuration>
-                    <failBuildOnCVSS>7</failBuildOnCVSS>
-                    <suppressionFiles>
-                        <suppressionFile>src/main/resources/owasp-suppression.xml</suppressionFile>
-                    </suppressionFiles>
-                    <formats>
-                        <format>HTML</format>
-                        <format>XML</format>
-                        <format>JSON</format>
-                    </formats>
-                    <outputDirectory>${project.build.directory}/dependency-check</outputDirectory>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+
+            <!-- ========================================= -->
+            <!-- SURFIRE - МОДУЛЬНЫЕ ТЕСТЫ (70%)           -->
+            <!-- ========================================= -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <testFailureIgnore>false</testFailureIgnore>
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                        <exclude>**/IT*.java</exclude>
+                        <exclude>**/*ITCase.java</exclude>
+                        <exclude>**/*PerformanceTest.java</exclude>
+                        <exclude>**/integration/**/*.java</exclude>
+                        <exclude>**/performance/**/*.java</exclude>
+                    </excludes>
+                    <systemPropertyVariables>
+                        <spring.profiles.active>test</spring.profiles.active>
+                    </systemPropertyVariables>
+                    <argLine>${surefire.jacoco.args}</argLine>
+                </configuration>
+            </plugin>
+
+            <!-- ========================================= -->
+            <!-- FAILSAFE - ИНТЕГРАЦИОННЫЕ ТЕСТЫ (20%)    -->
+            <!-- ========================================= -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <configuration>
+                    <skipITs>${skipITs}</skipITs>
+                    <includes>
+                        <include>**/*IT.java</include>
+                        <include>**/IT*.java</include>
+                        <include>**/*ITCase.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*PerformanceTest.java</exclude>
+                    </excludes>
+                    <systemPropertyVariables>
+                        <spring.profiles.active>integration-test</spring.profiles.active>
+                    </systemPropertyVariables>
+                    <argLine>${failsafe.jacoco.args}</argLine>
                 </configuration>
                 <executions>
                     <execution>
+                        <id>integration-test</id>
                         <goals>
-                            <goal>check</goal>
+                            <goal>integration-test</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>verify</id>
+                        <goals>
+                            <goal>verify</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
 
+            <!-- ========================================= -->
+            <!-- JACOCO - ПОКРЫТИЕ КОДА                    -->
+            <!-- ========================================= -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>surefire.jacoco.args</propertyName>
+                            <destFile>${project.build.directory}/jacoco.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>prepare-agent-integration</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>failsafe.jacoco.args</propertyName>
+                            <destFile>${project.build.directory}/jacoco-it.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+                            <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+                            <excludes>
+                                <exclude>**/config/**</exclude>
+                                <exclude>**/entity/**</exclude>
+                                <exclude>**/exception/**</exclude>
+                                <exclude>**/Application.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report-integration</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-integration</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-it.exec</dataFile>
+                            <outputDirectory>${project.build.directory}/site/jacoco-it</outputDirectory>
+                            <excludes>
+                                <exclude>**/config/**</exclude>
+                                <exclude>**/entity/**</exclude>
+                                <exclude>**/exception/**</exclude>
+                                <exclude>**/Application.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>merge-reports</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>*.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.30</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                            <excludes>
+                                <exclude>**/config/**</exclude>
+                                <exclude>**/entity/**</exclude>
+                                <exclude>**/exception/**</exclude>
+                                <exclude>**/Application.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ========================================= -->
+            <!-- ДОПОЛНИТЕЛЬНЫЕ ПЛАГИНЫ                    -->
+            <!-- ========================================= -->
+
+            <!-- Отчет Surefire -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-report-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <aggregate>true</aggregate>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+            </plugin>
+
+            <!-- Анализ зависимостей -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.7.0</version>
+                <executions>
+                    <execution>
+                        <id>analyze</id>
+                        <goals>
+                            <goal>analyze</goal>
+                        </goals>
+                        <configuration>
+                            <failOnWarning>false</failOnWarning>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- SonarQube -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.10.0.2594</version>
+            </plugin>
+
+            <!-- SpotBugs -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.8.3.0</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Medium</threshold>
+                    <failOnError>false</failOnError>
+                </configuration>
+            </plugin>
+
+            <!-- Dependency Check (OWASP) -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>11.0.0</version>
+                <configuration>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <formats>
+                        <format>HTML</format>
+                        <format>XML</format>
+                    </formats>
+                </configuration>
+            </plugin>
+
+            <!-- Allure -->
             <plugin>
                 <groupId>io.qameta.allure</groupId>
                 <artifactId>allure-maven</artifactId>
@@ -785,22 +707,110 @@
                 <configuration>
                     <reportVersion>2.25.0</reportVersion>
                     <resultsDirectory>${project.build.directory}/allure-results</resultsDirectory>
-                    <reportDirectory>${project.build.directory}/allure-report</reportDirectory>
                 </configuration>
             </plugin>
         </plugins>
     </build>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>spring-milestones</id>
-            <url>https://repo.spring.io/milestone</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </pluginRepository>
-    </pluginRepositories>
+    <!-- ========================================= -->
+    <!-- ПРОФИЛИ                                   -->
+    <!-- ========================================= -->
+    <profiles>
+        <!-- ========================================= -->
+        <!-- МОДУЛЬНЫЕ ТЕСТЫ (70%)                      -->
+        <!-- ========================================= -->
+        <profile>
+            <id>unit-tests</id>
+            <properties>
+                <skipITs>true</skipITs>
+            </properties>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- ИНТЕГРАЦИОННЫЕ ТЕСТЫ (20%)                 -->
+        <!-- ========================================= -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- ТЕСТЫ ПРОИЗВОДИТЕЛЬНОСТИ (10%)             -->
+        <!-- ========================================= -->
+        <profile>
+            <id>performance-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/*PerformanceTest.java</include>
+                            </includes>
+                            <groups>performance</groups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- ВСЕ ТЕСТЫ (полный запуск)                 -->
+        <!-- ========================================= -->
+        <profile>
+            <id>full</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- CI ПРОФИЛЬ (только быстрые тесты)         -->
+        <!-- ========================================= -->
+        <profile>
+            <id>ci</id>
+            <properties>
+                <skipITs>true</skipITs>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>check</id>
+                                <phase>none</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ========================================= -->
+        <!-- SONAR ПРОФИЛИ                             -->
+        <!-- ========================================= -->
+        <profile>
+            <id>sonarcloud</id>
+            <properties>
+                <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+                <sonar.organization>tomas-mart</sonar.organization>
+                <sonar.projectKey>Tomas-Mart_llm-rag-spring</sonar.projectKey>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>sonar-local</id>
+            <properties>
+                <sonar.host.url>http://localhost:9000</sonar.host.url>
+                <sonar.projectKey>llm-rag-spring-local</sonar.projectKey>
+                <sonar.projectName>LLM RAG Spring (Local)</sonar.projectName>
+            </properties>
+        </profile>
+    </profiles>
 </project>

@@ -10,6 +10,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.Model;
 import com.example.rag.service.RagService;
+import io.qameta.allure.Description;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Severity;
+import io.qameta.allure.SeverityLevel;
+import io.qameta.allure.Story;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -20,8 +27,52 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+/**
+ * Модульный тест для проверки работы {@link ChatController}.
+ *
+ * <h2>Назначение</h2>
+ * <p>Проверяет работу контроллера чата: отображение страниц, обработку вопросов,
+ * валидацию ввода и обработку ошибок.</p>
+ *
+ * <h2>Тестируемые сценарии</h2>
+ * <ul>
+ *   <li>Отображение главной страницы</li>
+ *   <li>Задание вопроса (обычный, пустой, длинный, со спецсимволами)</li>
+ *   <li>Обработка ошибок сервиса</li>
+ * </ul>
+ *
+ * <h2>Особенности</h2>
+ * <ul>
+ *   <li>Использует {@link MockMvc} для тестирования контроллера</li>
+ *   <li>Все зависимости замоканы через {@link MockitoExtension}</li>
+ *   <li>Проверяет как HTTP ответы, так и взаимодействие с моделью</li>
+ * </ul>
+ *
+ * @author RAG Application Team
+ * @version 5.0
+ * @see ChatController
+ * @see RagService
+ * @since 1.0
+ */
+@Slf4j
 @ExtendWith(MockitoExtension.class)
+@Epic("Модульные тесты")
+@Feature("Контроллер чата")
 class ChatControllerTest {
+
+    // ============================================================
+    // КОНСТАНТЫ
+    // ============================================================
+
+    private static final String VIEW_INDEX = "index";
+    private static final String ATTR_QUESTION = "question";
+    private static final String ATTR_ANSWER = "answer";
+    private static final String PARAM_QUESTION = "question";
+    private static final String ERROR_MESSAGE = "Извините, произошла ошибка: ";
+
+    // ============================================================
+    // МОКИ
+    // ============================================================
 
     @Mock
     private RagService ragService;
@@ -34,117 +85,203 @@ class ChatControllerTest {
 
     private MockMvc mockMvc;
 
+    // ============================================================
+    // ИНИЦИАЛИЗАЦИЯ
+    // ============================================================
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(chatController).build();
+        log.info("✅ ChatControllerTest initialized");
     }
 
+    // ============================================================
+    // ТЕСТЫ
+    // ============================================================
+
     @Test
+    @Description("Проверка отображения главной страницы")
+    @Story("Отображение страниц")
+    @Severity(SeverityLevel.CRITICAL)
     void testIndexPage() throws Exception {
+        logTestStart("Testing index page");
+
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("index"))
-                .andExpect(model().attributeExists("question"))
-                .andExpect(model().attributeExists("answer"));
+                .andExpect(view().name(VIEW_INDEX))
+                .andExpect(model().attributeExists(ATTR_QUESTION))
+                .andExpect(model().attributeExists(ATTR_ANSWER));
 
-        System.out.println("✅ Тест главной страницы пройден");
+        logTestSuccess("Index page displayed correctly");
     }
 
     @Test
+    @Description("Проверка атрибутов модели на главной странице")
+    @Story("Отображение страниц")
+    @Severity(SeverityLevel.NORMAL)
     void testIndexPageWithModelAttributes() {
-        String viewName = chatController.index(model);
-        assertThat(viewName).isEqualTo("index");
-        verify(model).addAttribute("question", "");
-        verify(model).addAttribute("answer", "");
+        logTestStart("Testing model attributes");
 
-        System.out.println("✅ Тест атрибутов модели пройден");
+        String viewName = chatController.index(model);
+
+        assertThat(viewName)
+                .as("View name should be 'index'")
+                .isEqualTo(VIEW_INDEX);
+
+        verify(model).addAttribute(ATTR_QUESTION, "");
+        verify(model).addAttribute(ATTR_ANSWER, "");
+
+        logTestSuccess("Model attributes verified");
     }
 
     @Test
+    @Description("Проверка задания вопроса")
+    @Story("Обработка вопросов")
+    @Severity(SeverityLevel.CRITICAL)
     void testAskQuestion() throws Exception {
+        logTestStart("Testing ask question");
+
         String question = "What is Spring AI?";
         String expectedAnswer = "Spring AI is a framework for building AI applications.";
+
         when(ragService.ask(question)).thenReturn(expectedAnswer);
 
         mockMvc.perform(post("/ask")
-                        .param("question", question))
+                        .param(PARAM_QUESTION, question))
                 .andExpect(status().isOk())
-                .andExpect(view().name("index"))
-                .andExpect(model().attribute("question", question))
-                .andExpect(model().attribute("answer", expectedAnswer));
+                .andExpect(view().name(VIEW_INDEX))
+                .andExpect(model().attribute(ATTR_QUESTION, question))
+                .andExpect(model().attribute(ATTR_ANSWER, expectedAnswer));
 
         verify(ragService).ask(question);
 
-        System.out.println("✅ Тест вопроса пройден");
+        logTestSuccess("Question processed correctly");
     }
 
     @Test
+    @Description("Проверка задания пустого вопроса")
+    @Story("Обработка вопросов")
+    @Severity(SeverityLevel.NORMAL)
     void testAskQuestionWithEmptyQuestion() throws Exception {
+        logTestStart("Testing empty question");
+
         String question = "";
         String expectedAnswer = "Пожалуйста, задайте вопрос.";
+
         when(ragService.ask(question)).thenReturn(expectedAnswer);
 
         mockMvc.perform(post("/ask")
-                        .param("question", question))
+                        .param(PARAM_QUESTION, question))
                 .andExpect(status().isOk())
-                .andExpect(model().attribute("question", question))
-                .andExpect(model().attribute("answer", expectedAnswer));
+                .andExpect(model().attribute(ATTR_QUESTION, question))
+                .andExpect(model().attribute(ATTR_ANSWER, expectedAnswer));
 
         verify(ragService).ask(question);
 
-        System.out.println("✅ Тест с пустым вопросом пройден");
+        logTestSuccess("Empty question handled correctly");
     }
 
     @Test
+    @Description("Проверка задания длинного вопроса")
+    @Story("Обработка вопросов")
+    @Severity(SeverityLevel.NORMAL)
     void testAskQuestionWithLongQuestion() throws Exception {
+        logTestStart("Testing long question");
+
         String question = "What is the difference between " +
                           "Spring AI and LangChain4j? Which one should I use for " +
                           "building RAG applications with vector databases?";
+
         String expectedAnswer = "Both frameworks can be used, but Spring AI is more integrated with Spring ecosystem.";
+
         when(ragService.ask(question)).thenReturn(expectedAnswer);
 
         mockMvc.perform(post("/ask")
-                        .param("question", question))
+                        .param(PARAM_QUESTION, question))
                 .andExpect(status().isOk())
-                .andExpect(model().attribute("question", question))
-                .andExpect(model().attribute("answer", expectedAnswer));
+                .andExpect(model().attribute(ATTR_QUESTION, question))
+                .andExpect(model().attribute(ATTR_ANSWER, expectedAnswer));
 
         verify(ragService).ask(question);
 
-        System.out.println("✅ Тест с длинным вопросом пройден");
+        logTestSuccess("Long question handled correctly");
     }
 
     @Test
+    @Description("Проверка задания вопроса со специальными символами")
+    @Story("Обработка вопросов")
+    @Severity(SeverityLevel.NORMAL)
     void testAskQuestionWithSpecialCharacters() throws Exception {
+        logTestStart("Testing question with special characters");
+
         String question = "Что такое RAG? Spring AI vs LangChain4j? 🚀";
         String expectedAnswer = "RAG - это Retrieval-Augmented Generation.";
+
         when(ragService.ask(question)).thenReturn(expectedAnswer);
 
         mockMvc.perform(post("/ask")
-                        .param("question", question))
+                        .param(PARAM_QUESTION, question))
                 .andExpect(status().isOk())
-                .andExpect(model().attribute("question", question))
-                .andExpect(model().attribute("answer", expectedAnswer));
+                .andExpect(model().attribute(ATTR_QUESTION, question))
+                .andExpect(model().attribute(ATTR_ANSWER, expectedAnswer));
 
         verify(ragService).ask(question);
 
-        System.out.println("✅ Тест со специальными символами пройден");
+        logTestSuccess("Special characters handled correctly");
     }
 
     @Test
+    @Description("Проверка обработки ошибки сервиса")
+    @Story("Обработка ошибок")
+    @Severity(SeverityLevel.CRITICAL)
     void testAskQuestionWhenServiceThrowsException() throws Exception {
+        logTestStart("Testing service exception handling");
+
         String question = "Test question";
-        when(ragService.ask(question)).thenThrow(new RuntimeException("Service error"));
+        String errorMessage = "Service error";
+
+        when(ragService.ask(question)).thenThrow(new RuntimeException(errorMessage));
 
         mockMvc.perform(post("/ask")
-                        .param("question", question))
+                        .param(PARAM_QUESTION, question))
                 .andExpect(status().isOk())
-                .andExpect(view().name("index"))
-                .andExpect(model().attribute("question", question))
-                .andExpect(model().attribute("answer", "Извините, произошла ошибка: Service error"));
+                .andExpect(view().name(VIEW_INDEX))
+                .andExpect(model().attribute(ATTR_QUESTION, question))
+                .andExpect(model().attribute(ATTR_ANSWER, ERROR_MESSAGE + errorMessage));
 
         verify(ragService).ask(question);
 
-        System.out.println("✅ Тест с ошибкой сервиса пройден");
+        logTestSuccess("Service exception handled correctly");
+    }
+
+    // ============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    /**
+     * Логирует начало теста.
+     *
+     * @param message сообщение для логирования
+     */
+    private void logTestStart(String message) {
+        log.info("🚀 [{}] {}", getTestName(), message);
+    }
+
+    /**
+     * Логирует успешное завершение теста.
+     *
+     * @param message сообщение для логирования
+     */
+    private void logTestSuccess(String message) {
+        log.info("✅ [{}] {}", getTestName(), message);
+    }
+
+    /**
+     * Возвращает имя теста.
+     *
+     * @return имя класса теста
+     */
+    private String getTestName() {
+        return getClass().getSimpleName();
     }
 }

@@ -7,15 +7,24 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.rag.support.BaseTest;
+import io.qameta.allure.Description;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Severity;
+import io.qameta.allure.SeverityLevel;
+import io.qameta.allure.Story;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mockingDetails;
 
 /**
  * Тест для проверки конфигурации AI компонентов.
- * Проверяет создание и настройку клиентов Ollama.
  *
- * <p>Тестируемые компоненты:
+ * <h2>Назначение</h2>
+ * <p>Проверяет создание и настройку клиентов Ollama в тестовом профиле.</p>
+ *
+ * <h2>Тестируемые компоненты</h2>
  * <ul>
  *   <li>{@code OllamaApi} - клиент для Ollama API</li>
  *   <li>{@code OllamaChatModel} - модель чата</li>
@@ -24,16 +33,28 @@ import static org.mockito.Mockito.mockingDetails;
  *   <li>{@code OllamaChatOptions} - опции конфигурации</li>
  * </ul>
  *
- * <p>В тестовом профиле все компоненты заменены на моки.
- * Используется реальный PostgreSQL из application-test.yml.
+ * <h2>Особенности</h2>
+ * <ul>
+ *   <li>Все компоненты заменены на моки</li>
+ *   <li>Используется реальный PostgreSQL из application-test.yml</li>
+ *   <li>Проверяются свойства конфигурации</li>
+ * </ul>
  *
  * @author RAG Application Team
  * @version 5.0
+ * @see BaseTest
  * @since 1.0
  */
+@Slf4j
 @SpringBootTest
 @ActiveProfiles("test")
+@Epic("Модульные тесты")
+@Feature("Конфигурация AI")
 class AiConfigTest extends BaseTest {
+
+    // ============================================================
+    // ЗАВИСИМОСТИ
+    // ============================================================
 
     @Autowired
     private Environment environment;
@@ -46,62 +67,53 @@ class AiConfigTest extends BaseTest {
     // ============================================================
 
     @Test
+    @Description("Проверка создания мока OllamaApi")
+    @Story("AI компоненты")
+    @Severity(SeverityLevel.NORMAL)
     void testOllamaApiBean() {
-        assertThat(ollamaApi)
-                .as("OllamaApi mock should be created")
-                .isNotNull();
-
-        assertThat(mockingDetails(ollamaApi).isMock())
-                .as("OllamaApi should be a mock")
-                .isTrue();
-
-        logger.info("✅ OllamaApi mock successfully created");
+        assertThat(ollamaApi).isNotNull();
+        assertThat(mockingDetails(ollamaApi).isMock()).isTrue();
+        log.info("✅ OllamaApi mock created");
     }
 
     @Test
+    @Description("Проверка создания мока OllamaChatModel")
+    @Story("AI компоненты")
+    @Severity(SeverityLevel.NORMAL)
     void testChatModelBean() {
-        assertThat(ollamaChatModel)
-                .as("OllamaChatModel mock should be created")
-                .isNotNull();
-
-        assertThat(mockingDetails(ollamaChatModel).isMock())
-                .as("OllamaChatModel should be a mock")
-                .isTrue();
-
-        logger.info("✅ OllamaChatModel mock successfully created");
+        assertThat(ollamaChatModel).isNotNull();
+        assertThat(mockingDetails(ollamaChatModel).isMock()).isTrue();
+        log.info("✅ OllamaChatModel mock created");
     }
 
     @Test
+    @Description("Проверка создания мока ChatClient")
+    @Story("AI компоненты")
+    @Severity(SeverityLevel.NORMAL)
     void testChatClientBean() {
-        assertThat(chatClient)
-                .as("ChatClient mock should be created")
-                .isNotNull();
-
-        assertThat(mockingDetails(chatClient).isMock())
-                .as("ChatClient should be a mock")
-                .isTrue();
-
-        logger.info("✅ ChatClient mock successfully created");
+        assertThat(chatClient).isNotNull();
+        assertThat(mockingDetails(chatClient).isMock()).isTrue();
+        log.info("✅ ChatClient mock created");
     }
 
     @Test
+    @Description("Проверка создания мока VectorStore")
+    @Story("AI компоненты")
+    @Severity(SeverityLevel.NORMAL)
     void testVectorStoreBean() {
-        assertThat(vectorStore)
-                .as("VectorStore mock should be created")
-                .isNotNull();
-
-        assertThat(mockingDetails(vectorStore).isMock())
-                .as("VectorStore should be a mock")
-                .isTrue();
-
-        logger.info("✅ VectorStore mock successfully created");
+        assertThat(vectorStore).isNotNull();
+        assertThat(mockingDetails(vectorStore).isMock()).isTrue();
+        log.info("✅ VectorStore mock created");
     }
 
     // ============================================================
-    // ТЕСТЫ КОНФИГУРАЦИИ (из application-test.yml)
+    // ТЕСТЫ КОНФИГУРАЦИИ
     // ============================================================
 
     @Test
+    @Description("Проверка URL Ollama API")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.NORMAL)
     void testOllamaApiUrl() {
         String ollamaUrl = environment.getProperty(
                 "spring.ai.ollama.base-url",
@@ -112,56 +124,26 @@ class AiConfigTest extends BaseTest {
                 .as("Ollama URL should be configured")
                 .isEqualTo("http://localhost:11434");
 
-        logger.info("✅ OllamaApi configured with URL: {}", ollamaUrl);
+        log.info("✅ Ollama URL: {}", ollamaUrl);
     }
 
     @Test
+    @Description("Проверка опций OllamaChatOptions")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.NORMAL)
     void testOllamaOptionsConfiguration() {
         if (ollamaOptions == null) {
-            // Проверяем через Environment
-            String model = environment.getProperty("spring.ai.ollama.chat.options.model");
-            assertThat(model)
-                    .as("Model should be configured")
-                    .isEqualTo("qwen2.5-coder:7b");
-
-            Double temperature = environment.getProperty(
-                    "spring.ai.ollama.chat.options.temperature", Double.class);
-            assertThat(temperature)
-                    .as("Temperature should be configured")
-                    .isEqualTo(0.2);
-
-            Integer numCtx = environment.getProperty(
-                    "spring.ai.ollama.chat.options.num-ctx", Integer.class);
-            assertThat(numCtx)
-                    .as("Context size should be configured")
-                    .isEqualTo(4096);
-
-            logger.info("✅ Ollama options configured via application.yml");
-            logger.debug("   Model: {}", model);
-            logger.debug("   Temperature: {}", temperature);
-            logger.debug("   Context size: {}", numCtx);
+            verifyOptionsFromEnvironment();
             return;
         }
 
-        assertThat(ollamaOptions.getModel())
-                .as("Model should be configured")
-                .isEqualTo("qwen2.5-coder:7b");
-
-        assertThat(ollamaOptions.getTemperature())
-                .as("Temperature should be configured")
-                .isEqualTo(0.2);
-
-        assertThat(ollamaOptions.getNumCtx())
-                .as("Context size should be configured")
-                .isEqualTo(4096);
-
-        logger.info("✅ OllamaOptions configured successfully");
-        logger.debug("   Model: {}", ollamaOptions.getModel());
-        logger.debug("   Temperature: {}", ollamaOptions.getTemperature());
-        logger.debug("   Context size: {}", ollamaOptions.getNumCtx());
+        verifyOptionsFromBean();
     }
 
     @Test
+    @Description("Проверка модели эмбеддингов")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.NORMAL)
     void testEmbeddingModelConfiguration() {
         String embeddingModel = environment.getProperty(
                 "spring.ai.ollama.embedding.options.model",
@@ -172,10 +154,13 @@ class AiConfigTest extends BaseTest {
                 .as("Embedding model should be configured")
                 .isEqualTo("nomic-embed-text:v1.5");
 
-        logger.info("✅ Embedding model configured: {}", embeddingModel);
+        log.info("✅ Embedding model: {}", embeddingModel);
     }
 
     @Test
+    @Description("Проверка конфигурации VectorStore")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.NORMAL)
     void testVectorStoreConfiguration() {
         Integer dimensions = environment.getProperty(
                 "spring.ai.vectorstore.pgvector.dimensions", Integer.class);
@@ -195,31 +180,34 @@ class AiConfigTest extends BaseTest {
                 .as("Distance type should be configured")
                 .isEqualTo("EUCLIDEAN_DISTANCE");
 
-        logger.info("✅ VectorStore configured: dimensions={}, index={}, distance={}",
+        log.info("✅ VectorStore: dims={}, index={}, distance={}",
                 dimensions, indexType, distanceType);
     }
 
     @Test
+    @Description("Проверка DataSource (без H2)")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.CRITICAL)
     void testDataSourceConfiguration() {
-        // Проверяем, что используется реальный PostgreSQL, а не H2
         String url = environment.getProperty("spring.datasource.url");
         assertThat(url)
                 .as("DataSource should be PostgreSQL")
-                .contains("postgresql");
+                .contains("postgresql")
+                .doesNotContain("h2");
 
         String driver = environment.getProperty("spring.datasource.driver-class-name");
         assertThat(driver)
                 .as("Driver should be PostgreSQL")
                 .isEqualTo("org.postgresql.Driver");
 
-        logger.info("✅ DataSource configured with PostgreSQL: {}", url);
+        log.info("✅ DataSource: PostgreSQL");
+        log.debug("   URL: {}", url);
     }
 
-    // ============================================================
-    // КОМПЛЕКСНЫЕ ТЕСТЫ
-    // ============================================================
-
     @Test
+    @Description("Проверка всех свойств окружения")
+    @Story("Конфигурация")
+    @Severity(SeverityLevel.CRITICAL)
     void testEnvironmentProperties() {
         assertThat(environment.getProperty("spring.ai.ollama.base-url"))
                 .isEqualTo("http://localhost:11434");
@@ -236,39 +224,90 @@ class AiConfigTest extends BaseTest {
         assertThat(environment.getProperty("spring.ai.ollama.embedding.options.model"))
                 .isEqualTo("nomic-embed-text:v1.5");
 
-        // Проверяем, что нет H2
         assertThat(environment.getProperty("spring.datasource.url"))
                 .doesNotContain("h2");
 
-        logger.info("✅ All environment properties verified successfully (no H2)");
+        log.info("✅ All environment properties verified (no H2)");
     }
 
     @Test
+    @Description("Комплексная проверка AI конфигурации")
+    @Story("Интеграция")
+    @Severity(SeverityLevel.CRITICAL)
     void testAIConfigurationIntegration() {
-        // Проверяем, что моки доступны
+        // Проверяем моки
         assertThat(ollamaApi).isNotNull();
         assertThat(ollamaChatModel).isNotNull();
         assertThat(vectorStore).isNotNull();
         assertThat(chatClient).isNotNull();
 
-        // Проверяем, что все это моки
         assertThat(mockingDetails(ollamaApi).isMock()).isTrue();
         assertThat(mockingDetails(ollamaChatModel).isMock()).isTrue();
         assertThat(mockingDetails(vectorStore).isMock()).isTrue();
         assertThat(mockingDetails(chatClient).isMock()).isTrue();
 
-        // Проверяем, что DataSource реальный PostgreSQL
+        // Проверяем DataSource
         String url = environment.getProperty("spring.datasource.url");
         assertThat(url).contains("postgresql");
         assertThat(url).doesNotContain("h2");
 
-        logger.info("✅ All AI components are properly configured as mocks");
-        logger.info("✅ Using real PostgreSQL (no H2)");
-        logger.debug("   DataSource URL: {}", url);
-        logger.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
-        logger.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
-        logger.debug("   - VectorStore: {}", vectorStore.getClass().getSimpleName());
-        logger.debug("   - ChatClient: {}", chatClient.getClass().getSimpleName());
-        logger.debug("   Bean count: {}", applicationContext.getBeanDefinitionCount());
+        log.info("✅ AI components configured as mocks");
+        log.info("✅ Using real PostgreSQL (no H2)");
+        log.debug("   Bean count: {}", applicationContext.getBeanDefinitionCount());
+    }
+
+    // ============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    /**
+     * Проверяет опции через Environment.
+     */
+    private void verifyOptionsFromEnvironment() {
+        String model = environment.getProperty("spring.ai.ollama.chat.options.model");
+        assertThat(model)
+                .as("Model should be configured")
+                .isEqualTo("qwen2.5-coder:7b");
+
+        Double temperature = environment.getProperty(
+                "spring.ai.ollama.chat.options.temperature", Double.class);
+        assertThat(temperature)
+                .as("Temperature should be configured")
+                .isEqualTo(0.2);
+
+        Integer numCtx = environment.getProperty(
+                "spring.ai.ollama.chat.options.num-ctx", Integer.class);
+        assertThat(numCtx)
+                .as("Context size should be configured")
+                .isEqualTo(4096);
+
+        log.info("✅ Options from environment: model={}, temp={}, ctx={}",
+                model, temperature, numCtx);
+    }
+
+    /**
+     * Проверяет опции через OllamaChatOptions бин.
+     */
+    private void verifyOptionsFromBean() {
+        assertThat(ollamaOptions)
+                .as("OllamaOptions should be created")
+                .isNotNull();
+
+        assertThat(ollamaOptions.getModel())
+                .as("Model should be configured")
+                .isEqualTo("qwen2.5-coder:7b");
+
+        assertThat(ollamaOptions.getTemperature())
+                .as("Temperature should be configured")
+                .isEqualTo(0.2);
+
+        assertThat(ollamaOptions.getNumCtx())
+                .as("Context size should be configured")
+                .isEqualTo(4096);
+
+        log.info("✅ Options from bean: model={}, temp={}, ctx={}",
+                ollamaOptions.getModel(),
+                ollamaOptions.getTemperature(),
+                ollamaOptions.getNumCtx());
     }
 }

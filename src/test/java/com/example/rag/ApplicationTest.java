@@ -3,31 +3,55 @@ package com.example.rag;
 import org.junit.jupiter.api.Test;
 import com.example.rag.support.BaseTest;
 import com.example.rag.support.TestUtils;
+import lombok.extern.slf4j.Slf4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Тест для проверки загрузки Spring контекста.
- * Проверяет, что все бины и моки созданы корректно.
  *
- * <p>Данный тест является критическим, так как проверяет базовую
- * работоспособность Spring контекста. Если этот тест падает,
- * остальные тесты также не будут работать.
+ * <h2>Назначение</h2>
+ * <p>Проверяет базовую работоспособность Spring контекста.
+ * Если этот тест падает, остальные тесты также не будут работать.</p>
+ *
+ * <h2>Проверяемые аспекты</h2>
+ * <ul>
+ *   <li>Загрузка всех необходимых бинов</li>
+ *   <li>Создание всех моков</li>
+ *   <li>Активный профиль 'test'</li>
+ *   <li>Имя приложения</li>
+ *   <li>Обязательные свойства</li>
+ * </ul>
+ *
+ * <h2>Пример запуска</h2>
+ * <pre>{@code
+ * // Запустить все тесты
+ * mvn test -Dtest=ApplicationTest
+ *
+ * // Запустить конкретный тест
+ * mvn test -Dtest=ApplicationTest#contextLoads
+ * }</pre>
  *
  * @author RAG Application Team
- * @version 1.0
+ * @version 5.0
+ * @see BaseTest
  * @since 1.0
  */
+@Slf4j
 class ApplicationTest extends BaseTest {
+
+    // ============================================================
+    // ТЕСТЫ
+    // ============================================================
 
     /**
      * Проверяет, что Spring контекст загружается успешно.
      *
-     * <p>Тест выполняет следующие проверки:
+     * <p>Выполняет проверки:
      * <ul>
      *   <li>Загрузка всех необходимых бинов</li>
      *   <li>Создание всех моков</li>
-     *   <li>Приложение доступно для использования</li>
+     *   <li>Активный профиль 'test'</li>
      * </ul>
      *
      * <p>Время выполнения теста измеряется с помощью {@link TestUtils}.
@@ -47,54 +71,12 @@ class ApplicationTest extends BaseTest {
                     .as("ApplicationContext should not be null")
                     .isNotNull();
 
-            // Проверяем, что все моки созданы
-            assertThat(ollamaApi)
-                    .as("OllamaApi mock should be created")
-                    .isNotNull();
-
-            assertThat(ollamaChatModel)
-                    .as("OllamaChatModel mock should be created")
-                    .isNotNull();
-
-            assertThat(vectorStore)
-                    .as("VectorStore mock should be created")
-                    .isNotNull();
-
-            assertThat(chatClient)
-                    .as("ChatClient mock should be created")
-                    .isNotNull();
-
-            assertThat(embeddingModel)
-                    .as("EmbeddingModel mock should be created")
-                    .isNotNull();
-
-            // Проверяем, что DataSource доступен (если есть)
-            if (dataSource != null) {
-                assertThat(dataSource)
-                        .as("DataSource should be available")
-                        .isNotNull();
-            }
-
-            // Проверяем активные профили
-            String[] activeProfiles = applicationContext.getEnvironment().getActiveProfiles();
-            assertThat(activeProfiles)
-                    .as("Active profiles should contain 'test'")
-                    .contains("test");
+            verifyMocksExist();
+            verifyDataSourceExists();
+            verifyActiveProfile();
         });
 
-        logger.info("✅ Spring context loaded successfully!");
-        logger.info("📊 Bean count: {}", applicationContext.getBeanDefinitionCount());
-        logger.info("📊 Active profiles: {}", String.join(", ", applicationContext.getEnvironment().getActiveProfiles()));
-        logger.info("📊 All mocks created successfully:");
-        logger.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
-        logger.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
-        logger.debug("   - VectorStore: {}", vectorStore.getClass().getSimpleName());
-        logger.debug("   - ChatClient: {}", chatClient.getClass().getSimpleName());
-        logger.debug("   - EmbeddingModel: {}", embeddingModel.getClass().getSimpleName());
-        if (dataSource != null) {
-            logger.debug("   - DataSource: {}", dataSource.getClass().getSimpleName());
-        }
-
+        logContextSummary();
         logTestSuccess("Spring context loaded successfully");
     }
 
@@ -105,13 +87,9 @@ class ApplicationTest extends BaseTest {
     void testActiveProfile() {
         logTestStart("Checking active profile");
 
-        String[] activeProfiles = applicationContext.getEnvironment().getActiveProfiles();
-        assertThat(activeProfiles)
-                .as("Active profiles should contain 'test'")
-                .contains("test");
+        verifyActiveProfile();
 
-        logger.info("✅ Active profiles: {}", String.join(", ", activeProfiles));
-
+        log.info("✅ Active profiles: {}", String.join(", ", applicationContext.getEnvironment().getActiveProfiles()));
         logTestSuccess("Active profile verified");
     }
 
@@ -127,8 +105,7 @@ class ApplicationTest extends BaseTest {
                 .as("Application name should not be null")
                 .isNotNull();
 
-        logger.info("✅ Application name: {}", appName);
-
+        log.info("✅ Application name: {}", appName);
         logTestSuccess("Application name verified");
     }
 
@@ -139,6 +116,71 @@ class ApplicationTest extends BaseTest {
     void testRequiredProperties() {
         logTestStart("Checking required properties");
 
+        verifyRequiredProperties();
+
+        log.info("✅ Required properties verified");
+        logTestSuccess("Required properties verified");
+    }
+
+    // ============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    /**
+     * Проверяет, что все моки созданы.
+     */
+    private void verifyMocksExist() {
+        assertThat(ollamaApi)
+                .as("OllamaApi mock should be created")
+                .isNotNull();
+
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel mock should be created")
+                .isNotNull();
+
+        assertThat(vectorStore)
+                .as("VectorStore mock should be created")
+                .isNotNull();
+
+        assertThat(chatClient)
+                .as("ChatClient mock should be created")
+                .isNotNull();
+
+        assertThat(embeddingModel)
+                .as("EmbeddingModel mock should be created")
+                .isNotNull();
+
+        log.debug("✅ All mocks verified");
+    }
+
+    /**
+     * Проверяет, что DataSource доступен.
+     */
+    private void verifyDataSourceExists() {
+        if (dataSource != null) {
+            assertThat(dataSource)
+                    .as("DataSource should be available")
+                    .isNotNull();
+            log.debug("✅ DataSource available");
+        } else {
+            log.debug("ℹ️ DataSource not available (optional)");
+        }
+    }
+
+    /**
+     * Проверяет, что профиль 'test' активен.
+     */
+    private void verifyActiveProfile() {
+        String[] activeProfiles = applicationContext.getEnvironment().getActiveProfiles();
+        assertThat(activeProfiles)
+                .as("Active profiles should contain 'test'")
+                .contains("test");
+    }
+
+    /**
+     * Проверяет обязательные свойства.
+     */
+    private void verifyRequiredProperties() {
         // Проверяем DataSource URL
         String dbUrl = environment.getProperty("spring.datasource.url");
         assertThat(dbUrl)
@@ -161,11 +203,26 @@ class ApplicationTest extends BaseTest {
                 .isNotNull()
                 .isEqualTo("qwen2.5-coder:7b");
 
-        logger.info("✅ Required properties verified:");
-        logger.debug("   Database URL: {}", dbUrl);
-        logger.debug("   Ollama URL: {}", ollamaUrl);
-        logger.debug("   Model: {}", model);
+        log.debug("   Database URL: {}", dbUrl);
+        log.debug("   Ollama URL: {}", ollamaUrl);
+        log.debug("   Model: {}", model);
+    }
 
-        logTestSuccess("Required properties verified");
+    /**
+     * Логирует сводку по контексту.
+     */
+    private void logContextSummary() {
+        log.info("📊 Bean count: {}", applicationContext.getBeanDefinitionCount());
+        log.info("📊 Active profiles: {}", String.join(", ", applicationContext.getEnvironment().getActiveProfiles()));
+
+        log.debug("   - OllamaApi: {}", ollamaApi.getClass().getSimpleName());
+        log.debug("   - OllamaChatModel: {}", ollamaChatModel.getClass().getSimpleName());
+        log.debug("   - VectorStore: {}", vectorStore.getClass().getSimpleName());
+        log.debug("   - ChatClient: {}", chatClient.getClass().getSimpleName());
+        log.debug("   - EmbeddingModel: {}", embeddingModel.getClass().getSimpleName());
+
+        if (dataSource != null) {
+            log.debug("   - DataSource: {}", dataSource.getClass().getSimpleName());
+        }
     }
 }
