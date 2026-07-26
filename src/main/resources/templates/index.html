@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <title>🌸 RAG Assistant</title>
 
-    <!-- Bootstrap CSS с SRI -->
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
           rel="stylesheet"
           integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
           crossorigin="anonymous">
 
-    <!-- Google Fonts с crossorigin -->
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;600&display=swap"
           rel="stylesheet"
           crossorigin="anonymous">
+
     <style>
         /* --- Общие стили --- */
         * {
@@ -266,7 +267,7 @@
             padding-bottom: 8px;
         }
 
-        /* --- Поле ввода (РАСШИРЕН) --- */
+        /* --- Поле ввода --- */
         .input-group-roses {
             border-radius: 50px;
             overflow: hidden;
@@ -282,13 +283,13 @@
         .input-group-roses input {
             border: 2px solid #f8bbd0;
             border-right: none;
-            padding: 24px 32px; /* ← УВЕЛИЧЕН */
-            font-size: 1.3rem; /* ← УВЕЛИЧЕН */
+            padding: 24px 32px;
+            font-size: 1.3rem;
             border-radius: 50px 0 0 50px;
             background: rgba(255, 255, 255, 0.9);
             transition: all 0.3s ease;
             color: #4a1a2e;
-            height: 80px; /* ← ФИКСИРОВАННАЯ ВЫСОТА */
+            height: 80px;
         }
 
         .input-group-roses input:focus {
@@ -305,20 +306,32 @@
             font-size: 1.1rem;
         }
 
+        /* ✅ Скрытый лейбл для доступности */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
         .btn-rose {
             border-radius: 0 50px 50px 0;
-            padding: 24px 50px; /* ← УВЕЛИЧЕН */
+            padding: 24px 50px;
             background: linear-gradient(135deg, #e91e63, #ad1457);
             border: none;
             font-weight: 600;
-            font-size: 1.3rem; /* ← УВЕЛИЧЕН */
+            font-size: 1.3rem;
             letter-spacing: 0.5px;
             color: white;
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
-            height: 80px; /* ← ФИКСИРОВАННАЯ ВЫСОТА */
-            min-width: 200px; /* ← МИНИМАЛЬНАЯ ШИРИНА */
+            height: 80px;
+            min-width: 200px;
         }
 
         .btn-rose::before {
@@ -336,7 +349,7 @@
             transform: scale(0.95);
         }
 
-        /* --- Карточка ответа (РАСШИРЕНА) --- */
+        /* --- Карточка ответа --- */
         .card-answer {
             border: 2px solid #f8bbd0;
             border-radius: 20px;
@@ -363,17 +376,17 @@
             border-bottom: 2px solid #f48fb1;
             font-weight: 600;
             color: #7a1a3a;
-            padding: 18px 28px; /* ← УВЕЛИЧЕН */
-            font-size: 1.2rem; /* ← УВЕЛИЧЕН */
+            padding: 18px 28px;
+            font-size: 1.2rem;
             letter-spacing: 1px;
         }
 
         .card-answer .card-body {
-            padding: 40px 50px; /* ← УВЕЛИЧЕН */
+            padding: 40px 50px;
             color: #3d1a2b;
-            font-size: 1.2rem; /* ← УВЕЛИЧЕН */
-            line-height: 1.8; /* ← УВЕЛИЧЕН */
-            max-height: 800px; /* ← УВЕЛИЧЕН */
+            font-size: 1.2rem;
+            line-height: 1.8;
+            max-height: 800px;
             overflow-y: auto;
         }
 
@@ -408,17 +421,17 @@
         .input-group-upload input[type="file"] {
             border: 2px solid #f8bbd0;
             border-right: none;
-            padding: 18px 28px; /* ← УВЕЛИЧЕН */
+            padding: 18px 28px;
             border-radius: 50px 0 0 50px;
             background: rgba(255, 255, 255, 0.85);
             color: #4a1a2e;
             cursor: pointer;
             font-size: 1rem;
-            height: 70px; /* ← ФИКСИРОВАННАЯ ВЫСОТА */
+            height: 70px;
         }
 
         .input-group-upload input[type="file"]::file-selector-button {
-            padding: 10px 24px; /* ← УВЕЛИЧЕН */
+            padding: 10px 24px;
             border: none;
             border-radius: 30px;
             background: linear-gradient(135deg, #f8bbd0, #f48fb1);
@@ -437,15 +450,15 @@
 
         .btn-success-rose {
             border-radius: 0 50px 50px 0;
-            padding: 18px 40px; /* ← УВЕЛИЧЕН */
+            padding: 18px 40px;
             background: linear-gradient(135deg, #66bb6a, #43a047);
             border: none;
             font-weight: 600;
             color: white;
             transition: all 0.3s ease;
             font-size: 1rem;
-            height: 70px; /* ← ФИКСИРОВАННАЯ ВЫСОТА */
-            min-width: 160px; /* ← МИНИМАЛЬНАЯ ШИРИНА */
+            height: 70px;
+            min-width: 160px;
         }
 
         .btn-success-rose:hover {
@@ -603,6 +616,8 @@
                 <!-- Форма вопроса -->
                 <form method="post" action="/ask">
                     <div class="input-group input-group-roses">
+                        <!-- ✅ Добавлен скрытый label для доступности -->
+                        <label for="questionInput" class="visually-hidden">Введите ваш вопрос</label>
                         <input type="text" id="questionInput" name="question" class="form-control"
                                placeholder="Введите ваш вопрос..." th:value="${question}" required>
                         <button type="submit" class="btn btn-rose">Отправить</button>
@@ -627,6 +642,8 @@
                     <h5>Загрузить документ</h5>
                     <form method="post" action="/api/documents/upload" enctype="multipart/form-data">
                         <div class="input-group input-group-upload">
+                            <!-- ✅ Добавлен скрытый label для доступности -->
+                            <label for="fileInput" class="visually-hidden">Выберите файл для загрузки</label>
                             <input type="file" id="fileInput" name="file" class="form-control" required>
                             <button type="submit" class="btn btn-success-rose">Загрузить</button>
                         </div>
@@ -638,6 +655,11 @@
         </div>
     </div>
 </div>
+
+<!-- Bootstrap JS с SRI -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
 
 </body>
 </html>
