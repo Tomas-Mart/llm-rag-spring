@@ -114,6 +114,33 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' || 
       github.ref == 'refs/heads/develop'
+
+    # ДОБАВЛЕНЫ СЕРВИСЫ ДЛЯ ИНТЕГРАЦИОННЫХ ТЕСТОВ
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: rag_integration_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 32769:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - 11434:11434
+        options: >-
+          --health-cmd "ollama list"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 3
+
     steps:
       - uses: actions/checkout@v4
 
@@ -123,10 +150,10 @@ jobs:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           cache: maven
 
-      - name: Pre-pull Docker images
+      - name: Pull Ollama models
         run: |
-          docker pull pgvector/pgvector:pg16 || true
-          docker pull ollama/ollama:latest || true
+          docker exec $(docker ps -q -f name=ollama) ollama pull nomic-embed-text:v1.5 || true
+          docker exec $(docker ps -q -f name=ollama) ollama pull qwen2.5-coder:7b || true
 
       - name: Run Integration Tests
         run: |
@@ -147,6 +174,15 @@ jobs:
             target/surefire-reports/
             target/failsafe-reports/
           retention-days: 7
+
+      - name: Publish report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Integration Tests
+          path: target/failsafe-reports/*.xml
+          reporter: java-junit
+          fail-on-error: false
 
   # ============================================
   # 4. SONARCLOUD
@@ -230,6 +266,8 @@ jobs:
           tags: |
             type=sha,format=short
             type=raw,value=latest
+            type=ref,event=branch
+            type=ref,event=pr
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -263,23 +301,17 @@ jobs:
             set -e
             echo "🚀 Starting deployment..."
             
-            # Pull latest image
             docker pull ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}:latest
             
-            # Navigate to app directory
             cd /opt/app || exit 1
             
-            # Backup current container
             docker compose ps app > /dev/null 2>&1 && docker compose stop app || true
             
-            # Start new container
             docker compose up -d --no-deps app
             
-            # Wait for health check
             sleep 10
             curl -f http://localhost:8080/actuator/health || exit 1
             
-            # Clean old images
             docker system prune -f
             
             echo "✅ Deployment completed successfully"
@@ -320,7 +352,6 @@ jobs:
             • Commit: ${{ github.sha }}
             • Author: ${{ github.event.head_commit.author.name }}
             • Status: ${{ steps.status.outputs.status }}
-            • URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             
             📊 Test Results:
             • Unit Tests: ${{ needs.unit-tests.result }}
@@ -329,3 +360,5 @@ jobs:
             
             🐳 Docker: ${{ needs.docker-build.result }}
             🚀 Deploy: ${{ needs.deploy.result }}
+            
+            🔗 URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
