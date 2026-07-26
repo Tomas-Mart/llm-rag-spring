@@ -83,7 +83,8 @@
         </sonar.cpd.exclusions>
 
         <!-- Maven плагины -->
-        <skipITs>true</skipITs>
+        <skipITs>false</skipITs>
+
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
         <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>

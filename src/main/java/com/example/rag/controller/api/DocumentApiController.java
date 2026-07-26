@@ -18,22 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * REST API контроллер для работы с документами.
- * <p>
- * Используется для интеграционных тестов и внешних клиентов.
- * <p>
- * Отвечает за:
- * <ul>
- *   <li>Загрузку документов через REST API</li>
- *   <li>Удаление документов</li>
- *   <li>Получение информации о документах</li>
- * </ul>
- * <p>
- * Вся бизнес-логика делегируется {@link DocumentIngestionService}.
- *
- * @author RAG Application Team
- * @version 1.0
- * @see DocumentIngestionService
- * @since 1.0
  */
 @Slf4j
 @RestController
@@ -43,13 +27,6 @@ public class DocumentApiController {
 
     private final DocumentIngestionService ingestionService;
 
-    /**
-     * Загружает документ через REST API.
-     *
-     * @param file     загружаемый файл
-     * @param metadata метаданные (опционально)
-     * @return ResponseEntity с сообщением о результате
-     */
     @PostMapping("/documents")
     public ResponseEntity<Map<String, Object>> uploadDocument(
             @RequestParam("file") MultipartFile file,
@@ -59,7 +36,6 @@ public class DocumentApiController {
         log.info("📄 [API] Загрузка документа: {}", fileName);
 
         try {
-            // Валидация
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Файл не выбран или пустой"));
@@ -70,9 +46,9 @@ public class DocumentApiController {
                         .body(Map.of("error", "Размер файла превышает 10MB"));
             }
 
-            // Загрузка
             ingestionService.ingestDocument(file, metadata);
 
+            assert fileName != null;
             return ResponseEntity.ok(Map.of(
                     "message", "Document uploaded successfully",
                     "fileName", fileName,
@@ -91,12 +67,6 @@ public class DocumentApiController {
         }
     }
 
-    /**
-     * Удаляет документ по ID.
-     *
-     * @param id ID документа
-     * @return ResponseEntity с сообщением о результате
-     */
     @DeleteMapping("/documents/{id}")
     public ResponseEntity<Map<String, Object>> deleteDocument(@PathVariable Long id) {
         log.info("🗑️ [API] Удаление документа: {}", id);
@@ -114,6 +84,12 @@ public class DocumentApiController {
                     "id", id
             ));
 
+        } catch (RuntimeException e) {
+            // ИСПРАВЛЕНО: Обрабатываем RuntimeException как "не найден"
+            log.warn("⚠️ [API] Документ не найден: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Документ с ID " + id + " не найден"));
+
         } catch (Exception e) {
             log.error("❌ [API] Ошибка удаления документа: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()
@@ -121,12 +97,6 @@ public class DocumentApiController {
         }
     }
 
-    /**
-     * Проверяет существование документа по имени файла.
-     *
-     * @param fileName имя файла
-     * @return ResponseEntity с информацией о существовании
-     */
     @GetMapping("/documents/exists")
     public ResponseEntity<Map<String, Object>> documentExists(
             @RequestParam("fileName") String fileName

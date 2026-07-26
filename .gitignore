@@ -325,4 +325,4 @@ target/performance-test-classes/
 *.recommenders
 *.idea
 *.vscode
-*.gitattributes
+*.gitattributessrc/test/resources/testcontainers.properties
