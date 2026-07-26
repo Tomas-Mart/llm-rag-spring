@@ -150,38 +150,46 @@ public class OcrService {
      * @return true если Tesseract доступен
      */
     public boolean isTesseractAvailable() {
-        try {
-            String[] possiblePaths = {
-                    "/usr/bin/tesseract",
-                    "/usr/local/bin/tesseract",
-                    "/opt/homebrew/bin/tesseract",
-                    "/usr/share/tesseract-ocr/tesseract"
-            };
+        String[] possiblePaths = {
+                "/usr/bin/tesseract",
+                "/usr/local/bin/tesseract",
+                "/opt/homebrew/bin/tesseract",
+                "/usr/share/tesseract-ocr/tesseract"
+        };
 
-            for (String tesseractPath : possiblePaths) {
-                File tesseractFile = new File(tesseractPath);
-                if (tesseractFile.exists() && tesseractFile.canExecute()) {
-                    Process process = Runtime.getRuntime().exec(new String[]{tesseractPath, "--version"});
-                    try {
-                        int exitCode = process.waitFor();
-                        if (exitCode == 0) {
-                            log.info("✅ Tesseract найден по пути: {}", tesseractPath);
-                            return true;
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();  // ✅ Восстанавливаем статус прерывания
-                        log.warn("⚠️ Процесс проверки Tesseract был прерван: {}", e.getMessage());
-                        return false;
-                    }
+        for (String tesseractPath : possiblePaths) {
+            File tesseractFile = new File(tesseractPath);
+            if (tesseractFile.exists() && tesseractFile.canExecute()) {
+                if (checkTesseractPath(tesseractPath)) {
+                    return true;
                 }
             }
-
-            log.warn("⚠️ Tesseract не найден в стандартных путях");
-            return false;
-
-        } catch (Exception e) {
-            log.warn("⚠️ Ошибка проверки Tesseract: {}", e.getMessage());
-            return false;
         }
+
+        log.warn("⚠️ Tesseract не найден в стандартных путях");
+        return false;
+    }
+
+    /**
+     * Проверяет конкретный путь к Tesseract.
+     *
+     * @param tesseractPath путь к исполняемому файлу Tesseract
+     * @return true если Tesseract доступен по указанному пути
+     */
+    private boolean checkTesseractPath(String tesseractPath) {
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{tesseractPath, "--version"});
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                log.info("✅ Tesseract найден по пути: {}", tesseractPath);
+                return true;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("⚠️ Процесс проверки Tesseract был прерван: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("⚠️ Ошибка проверки пути {}: {}", tesseractPath, e.getMessage());
+        }
+        return false;
     }
 }
