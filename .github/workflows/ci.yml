@@ -20,7 +20,6 @@ env:
   DOCKER_REGISTRY: ghcr.io
   SONAR_ORGANIZATION: 'tomas-mart'
   SONAR_PROJECT_KEY: 'Tomas-Mart_llm-rag-spring'
-  # Testcontainers настройки
   TESTCONTAINERS_RYUK_DISABLED: 'true'
 
 concurrency:
@@ -105,20 +104,18 @@ jobs:
           fail-on-error: false
 
   # ============================================
-  # 3. INTEGRATION TESTS - ПРОФЕССИОНАЛЬНАЯ НАСТРОЙКА
+  # 3. INTEGRATION TESTS
   # ============================================
   integration-tests:
     name: 🔗 Integration Tests
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 30
-    continue-on-error: false  # ← Меняем на false, чтобы падать при ошибках
-
+    continue-on-error: false
     if: |
       github.ref == 'refs/heads/main' || 
       github.ref == 'refs/heads/develop'
 
-    # ДОБАВЛЯЕМ DOCKER ДЛЯ TESTCONTAINERS
     permissions:
       contents: read
       packages: write
@@ -126,7 +123,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ШАГ 1: ПРОВЕРКА DOCKER
       - name: Verify Docker
         run: |
           docker --version
@@ -139,7 +135,6 @@ jobs:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           cache: maven
 
-      # ШАГ 2: НАСТРОЙКА TESTCONTAINERS
       - name: Configure Testcontainers
         run: |
           mkdir -p ~/.testcontainers
@@ -150,7 +145,6 @@ jobs:
           EOF
           cat ~/.testcontainers.properties
 
-      # ШАГ 3: ЗАПУСК ТЕСТОВ
       - name: Run Integration Tests
         run: |
           mvn verify -Pintegration-tests \
@@ -161,24 +155,9 @@ jobs:
             -Dfailsafe.rerunFailingTestsCount=2 \
             -Dtestcontainers.reuse.enable=true \
             -Dtestcontainers.ryuk.disabled=true \
-            -Djacoco.skip=true \
             -B
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
-
-      # ШАГ 4: ОТЛАДКА - ПОКАЗАТЬ СОСТОЯНИЕ ПОСЛЕ ТЕСТОВ
-      - name: Show test results
-        if: always()
-        run: |
-          echo "=== Integration Test Results ==="
-          echo "Failsafe reports:"
-          ls -la target/failsafe-reports/ 2>/dev/null || echo "No failsafe reports found"
-          echo ""
-          echo "Surefire reports:"
-          ls -la target/surefire-reports/ 2>/dev/null || echo "No surefire reports found"
-          echo ""
-          echo "=== Test Summary ==="
-          cat target/failsafe-reports/failsafe-summary.xml 2>/dev/null || echo "No summary found"
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
@@ -188,6 +167,8 @@ jobs:
           path: |
             target/surefire-reports/
             target/failsafe-reports/
+            target/site/jacoco/
+            target/site/jacoco-it/
           retention-days: 7
 
       - name: Publish report
@@ -205,7 +186,7 @@ jobs:
   sonarcloud:
     name: 📊 SonarCloud
     runs-on: ubuntu-latest
-    needs: [ unit-tests ]
+    needs: [ unit-tests, integration-tests ]
     if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -228,6 +209,7 @@ jobs:
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }} \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.java.source=${{ env.JAVA_VERSION }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml \
             -B
 
       - name: Quality Gate Check
@@ -244,8 +226,8 @@ jobs:
   docker-build:
     name: 🐳 Docker
     runs-on: ubuntu-latest
-    needs: [ sonarcloud, integration-tests ]  # ← Добавляем зависимость от integration-tests
-    if: github.ref == 'refs/heads/main' && success()  # ← Только если все успешно
+    needs: [ sonarcloud, integration-tests ]
+    if: github.ref == 'refs/heads/main' && success()
     permissions:
       packages: write
       contents: read
