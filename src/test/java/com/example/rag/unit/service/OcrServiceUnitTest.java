@@ -74,7 +74,6 @@ class OcrServiceUnitTest {
     // ============================================================
 
     private static final String TEST_FILE_NAME = "test.png";
-    private static final String TEST_IMAGE_DATA = "fake image data";
 
     // ============================================================
     // ВСПОМОГАТЕЛЬНЫЙ МЕТОД ДЛЯ СОЗДАНИЯ ТЕСТОВОГО ИЗОБРАЖЕНИЯ

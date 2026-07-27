@@ -44,8 +44,6 @@ class DocumentRepositoryPerformanceTest extends BasePerformanceTest {
     @PersistenceContext
     private EntityManager entityManager;
 
-    private Statistics statistics;
-
     private static final int DOCUMENT_COUNT = 50;
     private static final int MAX_QUERIES_THRESHOLD = 3;
 

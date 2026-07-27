@@ -9,6 +9,8 @@ import java.util.Optional;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -133,6 +135,10 @@ public class DocumentService {
      */
     private final OcrService ocrService;
 
+    @Lazy
+    @Autowired
+    private DocumentService self;
+
     // ============================================================
     // ПУБЛИЧНЫЕ МЕТОДЫ - УПРАВЛЕНИЕ ДОКУМЕНТАМИ
     // ============================================================
@@ -253,7 +259,7 @@ public class DocumentService {
         log.info("🔄 Перезагрузка документа: {}", fileName);
 
         // Удаляем старый документ
-        boolean deleted = deleteDocumentByFileName(fileName);
+        boolean deleted = self.deleteDocumentByFileName(fileName);
         if (!deleted) {
             log.warn("⚠️ Старый документ '{}' не найден, загружаем новый", fileName);
         } else {
@@ -261,7 +267,7 @@ public class DocumentService {
         }
 
         // Загружаем новый
-        ingestDocument(file, metadata);
+        self.ingestDocument(file, metadata);
         log.info("✅ Документ '{}' перезагружен успешно", fileName);
     }
 
@@ -472,7 +478,6 @@ public class DocumentService {
      */
     private String readFileContent(MultipartFile file) throws IOException {
         byte[] bytes = file.getBytes();
-
         if (bytes.length == 0) {
             return "";
         }
@@ -484,18 +489,20 @@ public class DocumentService {
             return extractTextFromImage(file, fileName);
         }
 
-        // 2. ОФИСНЫЕ ДОКУМЕНТЫ И ТЕКСТ → Tika
-        if (fileName != null && isOfficeOrTextFile(fileName)) {
-            return extractTextWithTika(file, bytes, fileName);
+        // 2. ФАЙЛЫ С ИЗВЕСТНЫМ РАСШИРЕНИЕМ
+        if (fileName != null) {
+            // 2.1. ОФИСНЫЕ / ТЕКСТОВЫЕ → Tika
+            if (isOfficeOrTextFile(fileName)) {
+                return extractTextWithTika(file, bytes, fileName);
+            }
+            // 2.2. БИНАРНЫЕ → БИНАРНЫЙ МЕТОД
+            if (isBinaryFile(fileName)) {
+                log.warn("⚠️ Бинарный файл: {}, пытаемся извлечь текст", fileName);
+                return extractTextFromBinary(bytes);
+            }
         }
 
-        // 3. БИНАРНЫЕ ФАЙЛЫ → БИНАРНЫЙ МЕТОД
-        if (fileName != null && isBinaryFile(fileName)) {
-            log.warn("⚠️ Бинарный файл: {}, пытаемся извлечь текст", fileName);
-            return extractTextFromBinary(bytes);
-        }
-
-        // 4. ДЛЯ ВСЕХ ОСТАЛЬНЫХ → Tika, затем бинарный
+        // 3. ВСЕ ОСТАЛЬНЫЕ → Tika
         return extractTextWithTika(file, bytes, fileName);
     }
 
@@ -542,14 +549,22 @@ public class DocumentService {
     /**
      * Извлечение текста из бинарных файлов.
      *
-     * <p>Ищет читаемые текстовые последовательности в байтовом массиве.
-     * Используется как fallback, когда Tika не справляется.</p>
+     * <p>Сначала пытается извлечь читаемый текст через {@link #cleanAndDecodeText(byte[])}.
+     * Если результат пустой, использует ручной поиск читаемых последовательностей.</p>
      *
      * @param bytes бинарные данные файла
      * @return извлеченный текст или сообщение об ошибке
      */
     private String extractTextFromBinary(byte[] bytes) {
-        // Пытаемся найти читаемый текст в бинарном файле
+        // 1. Сначала пытаемся очистить и декодировать байты через публичный метод
+        String cleanedText = cleanAndDecodeText(bytes);
+        if (!cleanedText.isEmpty()) {
+            log.debug("✅ Из бинарного файла извлечено {} символов через cleanAndDecodeText", cleanedText.length());
+            return cleanedText;
+        }
+
+        // 2. Fallback: ручной поиск читаемых последовательностей в бинарном файле
+        log.debug("🔍 cleanAndDecodeText не дал результата, пробуем ручной поиск");
         StringBuilder text = new StringBuilder();
         StringBuilder currentWord = new StringBuilder();
 
@@ -577,6 +592,8 @@ public class DocumentService {
         if (result.isEmpty()) {
             return "Извлечение текста из бинарного файла не удалось. Пожалуйста, используйте текстовый формат.";
         }
+
+        log.debug("✅ Из бинарного файла извлечено {} символов через ручной поиск", result.length());
         return result;
     }
 
@@ -618,20 +635,40 @@ public class DocumentService {
     // ПРИВАТНЫЕ МЕТОДЫ - ОБРАБОТКА ТЕКСТА
     // ============================================================
 
+    // ============================================================
+// ПУБЛИЧНЫЙ МЕТОД - ОБРАБОТКА ТЕКСТА
+// ============================================================
+
     /**
-     * Очистка и декодирование текста из байтов.
+     * Очищает и декодирует байты в текст UTF-8.
      *
-     * <p>Удаляет нулевые байты и управляющие символы, декодирует в UTF-8.</p>
+     * <p>Удаляет нулевые байты и управляющие символы, декодирует в UTF-8,
+     * заменяет проблемные символы.</p>
      *
-     * @param bytes исходные байты файла
-     * @return очищенный текст
+     * <p><b>Использование:</b>
+     * <pre>{@code
+     * // Очистка текста из бинарного файла
+     * String cleanText = documentService.cleanAndDecodeText(bytes);
+     *
+     * // Очистка пользовательского ввода
+     * String cleanInput = documentService.cleanAndDecodeText(input.getBytes());
+     * }</pre>
+     * </p>
+     *
+     * @param bytes исходные байты (может быть {@code null})
+     * @return очищенный текст в UTF-8, или пустая строка если {@code bytes == null}
      */
-    private String cleanAndDecodeText(byte[] bytes) {
+    public String cleanAndDecodeText(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return "";
+        }
+
         // Удаляем нулевые байты и другие проблемные символы
         byte[] cleaned = new byte[bytes.length];
         int j = 0;
         for (byte b : bytes) {
-            // Пропускаем нулевые байты и управляющие символы (кроме табуляции, перевода строки, возврата каретки)
+            // Пропускаем нулевые байты и управляющие символы
+            // (кроме табуляции, перевода строки, возврата каретки)
             if (b != 0x00 && b != 0x1A && b != 0x1B && b != 0x1C && b != 0x1D && b != 0x1E && b != 0x1F) {
                 cleaned[j++] = b;
             }

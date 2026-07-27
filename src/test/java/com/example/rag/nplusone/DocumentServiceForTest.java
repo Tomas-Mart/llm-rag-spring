@@ -47,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
  * @since 27.07.2026
  */
 @Slf4j
+@SuppressWarnings("java:S2187")
 public class DocumentServiceForTest {
 
     /**
