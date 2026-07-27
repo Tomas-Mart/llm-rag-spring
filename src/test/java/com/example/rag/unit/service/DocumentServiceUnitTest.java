@@ -44,8 +44,10 @@ import static org.mockito.Mockito.when;
  *   <li>Загрузка с превышением размера</li>
  *   <li>Загрузка дубликата</li>
  *   <li>Загрузка пустого файла</li>
+ *   <li>Загрузка изображения через OCR</li>
  *   <li>Перезагрузка документа</li>
  *   <li>CRUD операции (получение, удаление, проверка существования)</li>
+ *   <li>Очистка всех документов</li>
  * </ul>
  *
  * @author RAG Application Team
@@ -92,9 +94,14 @@ class DocumentServiceUnitTest {
     // ИНИЦИАЛИЗАЦИЯ
     // ============================================================
 
+    /**
+     * Настраивает моки перед каждым тестом.
+     * Использует {@code lenient()} для избежания UnnecessaryStubbingException.
+     *
+     * @throws IOException если ошибка при создании InputStream
+     */
     @BeforeEach
     void setUp() throws IOException {
-        // Используем lenient() для моков, которые не используются во всех тестах
         lenient().when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
         lenient().when(multipartFile.getSize()).thenReturn(1024L);
         lenient().when(multipartFile.getBytes()).thenReturn(TEST_CONTENT.getBytes(StandardCharsets.UTF_8));
@@ -138,14 +145,13 @@ class DocumentServiceUnitTest {
     @DisplayName("Загрузка документа с превышением размера")
     void testIngestDocument_WhenFileTooLarge() {
         // Given
-        when(multipartFile.getSize()).thenReturn(11L * 1024 * 1024); // 11MB
+        when(multipartFile.getSize()).thenReturn(11L * 1024 * 1024);
 
         // When & Then
         assertThatThrownBy(() -> documentService.ingestDocument(multipartFile, TEST_METADATA))
                 .isInstanceOf(DocumentIngestionException.class)
                 .hasMessageContaining("превышает");
 
-        // Проверяем, что сохранение не вызывалось
         verify(documentRepository, never()).save(any(DocumentEntity.class));
         verify(vectorStore, never()).add(anyList());
 
@@ -170,7 +176,6 @@ class DocumentServiceUnitTest {
                 .isInstanceOf(DocumentIngestionException.class)
                 .hasMessageContaining("уже существует");
 
-        // Проверяем, что сохранение не вызывалось
         verify(documentRepository, never()).save(any(DocumentEntity.class));
         verify(vectorStore, never()).add(anyList());
 
@@ -182,14 +187,12 @@ class DocumentServiceUnitTest {
     void testIngestDocument_WhenFileIsEmpty() throws IOException {
         // Given
         when(multipartFile.getBytes()).thenReturn("".getBytes(StandardCharsets.UTF_8));
-        when(ocrService.isImageFile(any(MultipartFile.class))).thenReturn(false);
 
         // When & Then
         assertThatThrownBy(() -> documentService.ingestDocument(multipartFile, TEST_METADATA))
                 .isInstanceOf(DocumentIngestionException.class)
                 .hasMessageContaining("Файл пуст");
 
-        // Проверяем, что сохранение не вызывалось
         verify(documentRepository, never()).save(any(DocumentEntity.class));
         verify(vectorStore, never()).add(anyList());
 
@@ -252,7 +255,7 @@ class DocumentServiceUnitTest {
                 .build();
 
         when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
-        doNothing().when(vectorStore).add(anyList());  // ← ИСПРАВЛЕНО
+        doNothing().when(vectorStore).add(anyList());
 
         // When
         documentService.ingestDocument(multipartFile, TEST_METADATA);
@@ -295,7 +298,7 @@ class DocumentServiceUnitTest {
                 .build();
 
         when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
-        doNothing().when(vectorStore).add(anyList());  // ← ИСПРАВЛЕНО
+        doNothing().when(vectorStore).add(anyList());
 
         // When
         documentService.reIngestDocument(multipartFile, TEST_METADATA);
@@ -323,15 +326,13 @@ class DocumentServiceUnitTest {
                 .build();
 
         when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
-        doNothing().when(vectorStore).add(anyList());  // ← ИСПРАВЛЕНО
+        doNothing().when(vectorStore).add(anyList());
 
         // When
         documentService.reIngestDocument(multipartFile, TEST_METADATA);
 
         // Then
-        // Проверяем, что удаление не вызывалось
         verify(documentRepository, never()).deleteByFileName(TEST_FILE_NAME);
-        // Проверяем, что сохранение вызывалось
         verify(documentRepository).save(any(DocumentEntity.class));
         verify(vectorStore).add(anyList());
 
@@ -346,8 +347,17 @@ class DocumentServiceUnitTest {
     @DisplayName("Получение всех документов")
     void testGetAllDocuments() {
         // Given
-        DocumentEntity document1 = DocumentEntity.builder().id(1L).fileName("doc1.txt").build();
-        DocumentEntity document2 = DocumentEntity.builder().id(2L).fileName("doc2.txt").build();
+        DocumentEntity document1 = DocumentEntity.builder()
+                .id(1L)
+                .fileName("doc1.txt")
+                .content("Content 1")
+                .build();
+        DocumentEntity document2 = DocumentEntity.builder()
+                .id(2L)
+                .fileName("doc2.txt")
+                .content("Content 2")
+                .build();
+
         when(documentRepository.findAll()).thenReturn(List.of(document1, document2));
 
         // When
@@ -563,12 +573,16 @@ class DocumentServiceUnitTest {
         log.info("✅ Тест удаления с пустым именем пройден");
     }
 
+    // ============================================================
+    // ТЕСТЫ ДЛЯ ОЧИСТКИ
+    // ============================================================
+
     @Test
     @DisplayName("Очистка всех документов (только для тестов)")
     void testClearAllDocuments_Success() {
         // Given
         System.setProperty("spring.profiles.active", "test");
-        doNothing().when(documentRepository).deleteAll();  // ← ИСПРАВЛЕНО
+        doNothing().when(documentRepository).deleteAll();
 
         // When
         documentService.clearAllDocuments();
