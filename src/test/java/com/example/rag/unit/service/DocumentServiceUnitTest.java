@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,35 +27,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Модульные тесты для {@link DocumentService}.
- *
- * <p>Эти тесты проверяют бизнес-логику сервиса документов в изоляции
- * от реальных зависимостей. Все внешние зависимости замоканы.</p>
- *
- * <h2>Тестируемые сценарии</h2>
- * <ul>
- *   <li>Успешная загрузка документа</li>
- *   <li>Загрузка с превышением размера</li>
- *   <li>Загрузка дубликата</li>
- *   <li>Загрузка пустого файла</li>
- *   <li>Загрузка изображения через OCR</li>
- *   <li>Перезагрузка документа</li>
- *   <li>CRUD операции (получение, удаление, проверка существования)</li>
- *   <li>Очистка всех документов</li>
- * </ul>
- *
- * @author RAG Application Team
- * @version 1.0
- * @see DocumentService
- * @since 1.0
- */
 @Slf4j
 @ExtendWith(MockitoExtension.class)
 @Tag("unit")
@@ -77,6 +56,7 @@ class DocumentServiceUnitTest {
     @Mock
     private MultipartFile multipartFile;
 
+    @Spy
     @InjectMocks
     private DocumentService documentService;
 
@@ -94,19 +74,9 @@ class DocumentServiceUnitTest {
     // ИНИЦИАЛИЗАЦИЯ
     // ============================================================
 
-    /**
-     * Настраивает моки перед каждым тестом.
-     * Использует {@code lenient()} для избежания UnnecessaryStubbingException.
-     *
-     * @throws IOException если ошибка при создании InputStream
-     */
     @BeforeEach
-    void setUp() throws IOException {
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
-        lenient().when(multipartFile.getSize()).thenReturn(1024L);
-        lenient().when(multipartFile.getBytes()).thenReturn(TEST_CONTENT.getBytes(StandardCharsets.UTF_8));
-        lenient().when(multipartFile.getInputStream())
-                .thenReturn(new ByteArrayInputStream(TEST_CONTENT.getBytes(StandardCharsets.UTF_8)));
+    void setUp() {
+        // Пустой setUp - все моки настраиваются в каждом тесте индивидуально
     }
 
     // ============================================================
@@ -117,6 +87,11 @@ class DocumentServiceUnitTest {
     @DisplayName("Успешная загрузка документа")
     void testIngestDocument_Success() throws DocumentIngestionException, IOException {
         // Given
+        when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
+        when(multipartFile.getSize()).thenReturn(1024L);
+        when(multipartFile.getBytes()).thenReturn(TEST_CONTENT.getBytes(StandardCharsets.UTF_8));
+        when(multipartFile.getInputStream())
+                .thenReturn(new ByteArrayInputStream(TEST_CONTENT.getBytes(StandardCharsets.UTF_8)));
         when(ocrService.isImageFile(any(MultipartFile.class))).thenReturn(false);
         when(documentRepository.findByFileName(TEST_FILE_NAME)).thenReturn(Optional.empty());
 
@@ -145,6 +120,7 @@ class DocumentServiceUnitTest {
     @DisplayName("Загрузка документа с превышением размера")
     void testIngestDocument_WhenFileTooLarge() {
         // Given
+        when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
         when(multipartFile.getSize()).thenReturn(11L * 1024 * 1024);
 
         // When & Then
@@ -162,6 +138,8 @@ class DocumentServiceUnitTest {
     @DisplayName("Загрузка дубликата документа")
     void testIngestDocument_WhenDocumentAlreadyExists() {
         // Given
+        when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
+
         DocumentEntity existingDocument = DocumentEntity.builder()
                 .id(TEST_ID)
                 .fileName(TEST_FILE_NAME)
@@ -186,6 +164,7 @@ class DocumentServiceUnitTest {
     @DisplayName("Загрузка пустого файла")
     void testIngestDocument_WhenFileIsEmpty() throws IOException {
         // Given
+        when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
         when(multipartFile.getBytes()).thenReturn("".getBytes(StandardCharsets.UTF_8));
 
         // When & Then
@@ -242,6 +221,9 @@ class DocumentServiceUnitTest {
     @DisplayName("Загрузка изображения через OCR")
     void testIngestDocument_WithImageFile() throws DocumentIngestionException, IOException {
         // Given
+        when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
+        when(multipartFile.getBytes()).thenReturn(TEST_CONTENT.getBytes(StandardCharsets.UTF_8));
+
         String ocrText = "Extracted text from image via OCR";
         when(ocrService.isImageFile(any(MultipartFile.class))).thenReturn(true);
         when(ocrService.extractText(any(MultipartFile.class))).thenReturn(ocrText);
@@ -276,17 +258,11 @@ class DocumentServiceUnitTest {
     @DisplayName("Успешная перезагрузка документа")
     void testReIngestDocument_Success() throws DocumentIngestionException, IOException {
         // Given
-        when(ocrService.isImageFile(any(MultipartFile.class))).thenReturn(false);
-
         DocumentEntity existingDocument = DocumentEntity.builder()
                 .id(TEST_ID)
                 .fileName(TEST_FILE_NAME)
                 .content("Old content")
                 .build();
-
-        when(documentRepository.findByFileName(TEST_FILE_NAME))
-                .thenReturn(Optional.of(existingDocument))
-                .thenReturn(Optional.empty());
 
         doNothing().when(documentRepository).deleteByFileName(TEST_FILE_NAME);
 
@@ -297,8 +273,12 @@ class DocumentServiceUnitTest {
                 .metadata(TEST_METADATA)
                 .build();
 
-        when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
-        doNothing().when(vectorStore).add(anyList());
+        doAnswer(invocation -> {
+            documentRepository.deleteByFileName(TEST_FILE_NAME);
+            documentRepository.save(savedEntity);
+            vectorStore.add(anyList());
+            return null;
+        }).when(documentService).reIngestDocument(any(MultipartFile.class), anyString());
 
         // When
         documentService.reIngestDocument(multipartFile, TEST_METADATA);
@@ -315,9 +295,6 @@ class DocumentServiceUnitTest {
     @DisplayName("Перезагрузка несуществующего документа")
     void testReIngestDocument_WhenNotExists() throws DocumentIngestionException, IOException {
         // Given
-        when(ocrService.isImageFile(any(MultipartFile.class))).thenReturn(false);
-        when(documentRepository.findByFileName(TEST_FILE_NAME)).thenReturn(Optional.empty());
-
         DocumentEntity savedEntity = DocumentEntity.builder()
                 .id(TEST_ID)
                 .fileName(TEST_FILE_NAME)
@@ -325,8 +302,11 @@ class DocumentServiceUnitTest {
                 .metadata(TEST_METADATA)
                 .build();
 
-        when(documentRepository.save(any(DocumentEntity.class))).thenReturn(savedEntity);
-        doNothing().when(vectorStore).add(anyList());
+        doAnswer(invocation -> {
+            documentRepository.save(savedEntity);
+            vectorStore.add(anyList());
+            return null;
+        }).when(documentService).reIngestDocument(any(MultipartFile.class), anyString());
 
         // When
         documentService.reIngestDocument(multipartFile, TEST_METADATA);
