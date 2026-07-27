@@ -14,9 +14,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.rag.service.OcrService;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 /**
@@ -38,7 +42,7 @@ import static org.mockito.Mockito.when;
  *
  * <h2>Тестируемые сценарии</h2>
  * <ul>
- *   <li>Распознавание различных форматов изображений (PNG, JPG, GIF, BMP, TIFF, WebP)</li>
+ *   <li>Распознавание различных форматов изображений (PNG, JPG, JPEG, GIF, BMP, TIFF, WebP)</li>
  *   <li>Обработка null и пустых файлов</li>
  *   <li>Извлечение текста из изображений</li>
  *   <li>Обработка ошибок Tesseract</li>
@@ -89,11 +93,9 @@ class OcrServiceUnitTest {
         BufferedImage image = new BufferedImage(300, 100, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = image.createGraphics();
 
-        // Белый фон
         g2d.setColor(Color.WHITE);
         g2d.fillRect(0, 0, 300, 100);
 
-        // Черный текст
         g2d.setColor(Color.BLACK);
         g2d.setFont(new Font("Arial", Font.BOLD, 24));
         g2d.drawString(text, 50, 60);
@@ -119,12 +121,6 @@ class OcrServiceUnitTest {
     // ИНИЦИАЛИЗАЦИЯ
     // ============================================================
 
-    /**
-     * Настраивает моки перед каждым тестом.
-     * Использует {@code lenient()} для избежания UnnecessaryStubbingException.
-     *
-     * @throws IOException если ошибка при создании InputStream
-     */
     @BeforeEach
     void setUp() throws IOException {
         lenient().when(multipartFile.getOriginalFilename()).thenReturn(TEST_FILE_NAME);
@@ -133,127 +129,62 @@ class OcrServiceUnitTest {
     }
 
     // ============================================================
-    // ТЕСТЫ ДЛЯ isImageFile
+    // ТЕСТЫ ДЛЯ isImageFile (Parameterized)
     // ============================================================
 
-    @Test
-    @DisplayName("Проверка PNG изображения")
-    void testIsImageFile_WithPng() {
+    @ParameterizedTest
+    @CsvSource({
+            "image.png, image/png, true",
+            "image.jpg, image/jpeg, true",
+            "image.jpeg, image/jpeg, true",
+            "image.gif, image/gif, true",
+            "image.bmp, image/bmp, true",
+            "image.tiff, image/tiff, true",
+            "image.webp, image/webp, true",
+            "document.txt, text/plain, false"
+    })
+    @DisplayName("Проверка распознавания различных форматов изображений")
+    void testIsImageFile_VariousFormats(String fileName, String contentType, boolean expected) {
         // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.png");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/png");
+        lenient().when(multipartFile.getOriginalFilename()).thenReturn(fileName);
+        lenient().when(multipartFile.getContentType()).thenReturn(contentType);
 
         // When
         boolean result = ocrService.isImageFile(multipartFile);
 
         // Then
-        assertThat(result).isTrue();
-        log.info("✅ PNG распознан как изображение");
+        assertThat(result).isEqualTo(expected);
+        log.info("✅ {} ({}) -> {}", fileName, contentType, result);
     }
 
-    @Test
-    @DisplayName("Проверка JPG изображения")
-    void testIsImageFile_WithJpg() {
+    @ParameterizedTest
+    @CsvSource({
+            "null, image/png, false",
+            "empty, , false",
+            "image, image/png, true",
+            "image.png, , true",
+            "IMAGE.PNG, image/png, true"
+    })
+    @DisplayName("Проверка граничных случаев для isImageFile")
+    void testIsImageFile_EdgeCases(String fileName, String contentType, boolean expected) throws IOException {
         // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.jpg");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/jpeg");
+        if ("null".equals(fileName)) {
+            lenient().when(multipartFile.getOriginalFilename()).thenReturn(null);
+            lenient().when(multipartFile.getContentType()).thenReturn(contentType);
+        } else if ("empty".equals(fileName)) {
+            lenient().when(multipartFile.getOriginalFilename()).thenReturn("");
+            lenient().when(multipartFile.getContentType()).thenReturn(null);
+        } else {
+            lenient().when(multipartFile.getOriginalFilename()).thenReturn(fileName);
+            lenient().when(multipartFile.getContentType()).thenReturn(contentType);
+        }
 
         // When
         boolean result = ocrService.isImageFile(multipartFile);
 
         // Then
-        assertThat(result).isTrue();
-        log.info("✅ JPG распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Проверка JPEG изображения")
-    void testIsImageFile_WithJpeg() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.jpeg");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/jpeg");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ JPEG распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Проверка GIF изображения")
-    void testIsImageFile_WithGif() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.gif");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/gif");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ GIF распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Проверка BMP изображения")
-    void testIsImageFile_WithBmp() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.bmp");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/bmp");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ BMP распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Проверка TIFF изображения")
-    void testIsImageFile_WithTiff() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.tiff");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/tiff");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ TIFF распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Проверка WebP изображения")
-    void testIsImageFile_WithWebp() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.webp");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/webp");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ WebP распознан как изображение");
-    }
-
-    @Test
-    @DisplayName("Текстовый файл не должен распознаваться как изображение")
-    void testIsImageFile_WithTextFile() {
-        // Given
-        when(multipartFile.getOriginalFilename()).thenReturn("document.txt");
-        when(multipartFile.getContentType()).thenReturn("text/plain");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isFalse();
-        log.info("✅ Текстовый файл НЕ распознан как изображение");
+        assertThat(result).isEqualTo(expected);
+        log.info("✅ fileName={}, contentType={} -> {}", fileName, contentType, result);
     }
 
     @Test
@@ -267,79 +198,6 @@ class OcrServiceUnitTest {
         log.info("✅ null файл обработан корректно");
     }
 
-    @Test
-    @DisplayName("null имя файла не должно распознаваться как изображение")
-    void testIsImageFile_WithNullFileName() {
-        // Given
-        when(multipartFile.getOriginalFilename()).thenReturn(null);
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isFalse();
-        log.info("✅ null имя файла обработано корректно");
-    }
-
-    @Test
-    @DisplayName("Пустое имя файла не должно распознаваться как изображение")
-    void testIsImageFile_WithEmptyFileName() {
-        // Given
-        when(multipartFile.getOriginalFilename()).thenReturn("");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isFalse();
-        log.info("✅ пустое имя файла обработано корректно");
-    }
-
-    @Test
-    @DisplayName("Изображение должно распознаваться по MIME типу без расширения")
-    void testIsImageFile_ByMimeTypeOnly() {
-        // Given
-        when(multipartFile.getOriginalFilename()).thenReturn("image");
-        when(multipartFile.getContentType()).thenReturn("image/png");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ Изображение распознано по MIME типу");
-    }
-
-    @Test
-    @DisplayName("Изображение с null ContentType должно распознаваться по расширению")
-    void testIsImageFile_WithNullContentType() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("image.png");
-        lenient().when(multipartFile.getContentType()).thenReturn(null);
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ Изображение распознано по расширению");
-    }
-
-    @Test
-    @DisplayName("Изображение с верхним регистром должно распознаваться")
-    void testIsImageFile_WithUpperCaseExtension() {
-        // Given
-        lenient().when(multipartFile.getOriginalFilename()).thenReturn("IMAGE.PNG");
-        lenient().when(multipartFile.getContentType()).thenReturn("image/png");
-
-        // When
-        boolean result = ocrService.isImageFile(multipartFile);
-
-        // Then
-        assertThat(result).isTrue();
-        log.info("✅ Изображение с верхним регистром распознано");
-    }
-
     // ============================================================
     // ТЕСТЫ ДЛЯ extractText
     // ============================================================
@@ -351,24 +209,20 @@ class OcrServiceUnitTest {
         BufferedImage testImage = createTestImage("Test OCR");
         byte[] imageBytes = imageToBytes(testImage);
 
-        // Создаем MultipartFile с реальным изображением
-        MultipartFile realImageFile = new org.springframework.mock.web.MockMultipartFile(
+        MultipartFile realImageFile = new MockMultipartFile(
                 "file",
                 "test.png",
                 "image/png",
                 imageBytes
         );
 
-        // Создаем spy для доступа к приватному полю
-        OcrService spyService = org.mockito.Mockito.spy(ocrService);
+        OcrService spyService = spy(ocrService);
 
-        // Создаем мок для ITesseract
         ITesseract mockTesseractLocal = mock(ITesseract.class);
         String expectedText = "Test OCR";
         when(mockTesseractLocal.doOCR(any(BufferedImage.class)))
                 .thenReturn(expectedText);
 
-        // Заменяем tesseract через рефлексию
         try {
             Field field = OcrService.class.getDeclaredField("tesseract");
             field.setAccessible(true);
@@ -415,22 +269,19 @@ class OcrServiceUnitTest {
         BufferedImage testImage = createTestImage("Test OCR");
         byte[] imageBytes = imageToBytes(testImage);
 
-        MultipartFile realImageFile = new org.springframework.mock.web.MockMultipartFile(
+        MultipartFile realImageFile = new MockMultipartFile(
                 "file",
                 "test.png",
                 "image/png",
                 imageBytes
         );
 
-        // Создаем spy
-        OcrService spyService = org.mockito.Mockito.spy(ocrService);
+        OcrService spyService = spy(ocrService);
 
-        // Создаем мок для ITesseract
         ITesseract mockTesseractLocal = mock(ITesseract.class);
         when(mockTesseractLocal.doOCR(any(BufferedImage.class)))
                 .thenThrow(new TesseractException("OCR error"));
 
-        // Заменяем tesseract через рефлексию
         try {
             Field field = OcrService.class.getDeclaredField("tesseract");
             field.setAccessible(true);
@@ -458,7 +309,6 @@ class OcrServiceUnitTest {
 
         // Then
         log.info("✅ Tesseract доступен: {}", result);
-        // Проверяем, что результат не null (может быть true или false)
         assertThat(result).isTrue();
     }
 
@@ -466,49 +316,22 @@ class OcrServiceUnitTest {
     // ТЕСТЫ ДЛЯ checkTesseractPath (через рефлексию)
     // ============================================================
 
-    @Test
-    @DisplayName("Проверка checkTesseractPath с существующим путем")
-    void testCheckTesseractPath_WithValidPath() throws Exception {
-        // Given
-        String validPath = "/usr/bin/tesseract";
-
+    @ParameterizedTest
+    @CsvSource({
+            "/usr/bin/tesseract, true",
+            "/path/to/nonexistent/tesseract, false",
+            "null, false"
+    })
+    @DisplayName("Проверка checkTesseractPath с разными путями")
+    void testCheckTesseractPath(String path, boolean expected) throws Exception {
         // When - через рефлексию
         Method method = OcrService.class.getDeclaredMethod("checkTesseractPath", String.class);
         method.setAccessible(true);
-        boolean result = (boolean) method.invoke(ocrService, validPath);
+        boolean result = (boolean) method.invoke(ocrService, "null".equals(path) ? null : path);
 
         // Then
-        log.info("✅ checkTesseractPath с существующим путем: {}", result);
-        assertThat(result).isTrue();
-    }
-
-    @Test
-    @DisplayName("Проверка checkTesseractPath с несуществующим путем")
-    void testCheckTesseractPath_WithInvalidPath() throws Exception {
-        // Given
-        String invalidPath = "/path/to/nonexistent/tesseract";
-
-        // When - через рефлексию
-        Method method = OcrService.class.getDeclaredMethod("checkTesseractPath", String.class);
-        method.setAccessible(true);
-        boolean result = (boolean) method.invoke(ocrService, invalidPath);
-
-        // Then
-        log.info("✅ checkTesseractPath с несуществующим путем: {}", result);
-        assertThat(result).isFalse();
-    }
-
-    @Test
-    @DisplayName("Проверка checkTesseractPath с null путем")
-    void testCheckTesseractPath_WithNullPath() throws Exception {
-        // When - через рефлексию
-        Method method = OcrService.class.getDeclaredMethod("checkTesseractPath", String.class);
-        method.setAccessible(true);
-        boolean result = (boolean) method.invoke(ocrService, new Object[]{null});
-
-        // Then
-        log.info("✅ checkTesseractPath с null путем: {}", result);
-        assertThat(result).isFalse();
+        log.info("✅ checkTesseractPath с путем '{}': {}", path, result);
+        assertThat(result).isEqualTo(expected);
     }
 
     // ============================================================
