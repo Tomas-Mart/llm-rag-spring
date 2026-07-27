@@ -161,73 +161,98 @@ public class DocumentIngestionService {
     private String readFileContent(MultipartFile file) throws IOException {
         byte[] bytes = file.getBytes();
 
-        // Если файл пустой
         if (bytes.length == 0) {
             return "";
         }
 
         String fileName = file.getOriginalFilename();
 
-        // =====================================================
         // 1. ИЗОБРАЖЕНИЯ → OCR
-        // =====================================================
         if (ocrService.isImageFile(file)) {
-            log.info("🖼️ Извлечение текста из изображения {} через OCR", fileName);
-            try {
-                String text = ocrService.extractText(file);
-                if (text != null && !text.isEmpty()) {
-                    return text;
-                }
-                throw new IOException("OCR не распознал текст в изображении: " + fileName);
-            } catch (Exception e) {
-                log.warn("⚠️ OCR не смог распознать текст из {}, пробуем другие методы", fileName);
-                throw new IOException("Не удалось извлечь текст из изображения: " + fileName, e);
-            }
+            return extractTextFromImage(file, fileName);
         }
 
-        // Проверяем по расширению
-        if (fileName != null) {
-            String lowerName = fileName.toLowerCase();
-
-            // =====================================================
-            // 2. ОФИСНЫЕ ДОКУМЕНТЫ И ТЕКСТ → Tika
-            // =====================================================
-            if (lowerName.endsWith(".pdf") || lowerName.endsWith(".docx") ||
-                lowerName.endsWith(".doc") || lowerName.endsWith(".xlsx") ||
-                lowerName.endsWith(".xls") || lowerName.endsWith(".pptx") ||
-                lowerName.endsWith(".ppt") || lowerName.endsWith(".rtf") ||
-                lowerName.endsWith(".odt") || lowerName.endsWith(".ods") ||
-                lowerName.endsWith(".odp") || lowerName.endsWith(".html") ||
-                lowerName.endsWith(".htm") || lowerName.endsWith(".xml") ||
-                lowerName.endsWith(".json") || lowerName.endsWith(".csv") ||
-                lowerName.endsWith(".md") || lowerName.endsWith(".txt") ||
-                lowerName.endsWith(".properties")) {
-
-                log.info("📄 Извлечение текста из {} через Tika", fileName);
-                try {
-                    return TextExtractor.extractText(file);
-                } catch (Exception e) {
-                    log.warn("⚠️ Tika не смог извлечь текст из {}, пробуем бинарный метод", fileName);
-                    return extractTextFromBinary(bytes);
-                }
-            }
-
-            // =====================================================
-            // 3. БИНАРНЫЕ ФАЙЛЫ → БИНАРНЫЙ МЕТОД
-            // =====================================================
-            if (lowerName.endsWith(".zip") || lowerName.endsWith(".jar") ||
-                lowerName.endsWith(".exe") || lowerName.endsWith(".dll") ||
-                lowerName.endsWith(".so") || lowerName.endsWith(".dylib") ||
-                lowerName.endsWith(".bin")) {
-                log.warn("⚠️ Бинарный файл: {}, пытаемся извлечь текст", fileName);
-                return extractTextFromBinary(bytes);
-            }
+        // 2. ОФИСНЫЕ ДОКУМЕНТЫ И ТЕКСТ → Tika
+        if (fileName != null && isOfficeOrTextFile(fileName)) {
+            return extractTextWithTika(file, bytes, fileName);
         }
 
-        // =====================================================
+        // 3. БИНАРНЫЕ ФАЙЛЫ → БИНАРНЫЙ МЕТОД
+        if (fileName != null && isBinaryFile(fileName)) {
+            log.warn("⚠️ Бинарный файл: {}, пытаемся извлечь текст", fileName);
+            return extractTextFromBinary(bytes);
+        }
+
         // 4. ДЛЯ ВСЕХ ОСТАЛЬНЫХ → Tika, затем бинарный
-        // =====================================================
-        log.info("📄 Пробуем извлечь текст из {} через Tika", fileName);
+        return extractTextWithTika(file, bytes, fileName);
+    }
+
+    /**
+     * Извлекает текст из изображения через OCR.
+     *
+     * @param file     загружаемый файл изображения
+     * @param fileName имя файла
+     * @return извлеченный текст
+     * @throws IOException если ошибка OCR распознавания
+     */
+    private String extractTextFromImage(MultipartFile file, String fileName) throws IOException {
+        log.info("🖼️ Извлечение текста из изображения {} через OCR", fileName);
+        try {
+            String text = ocrService.extractText(file);
+            if (text != null && !text.isEmpty()) {
+                return text;
+            }
+            throw new IOException("OCR не распознал текст в изображении: " + fileName);
+        } catch (Exception e) {
+            log.warn("⚠️ OCR не смог распознать текст из {}, пробуем другие методы", fileName);
+            throw new IOException("Не удалось извлечь текст из изображения: " + fileName, e);
+        }
+    }
+
+    /**
+     * Проверяет, является ли файл офисным или текстовым.
+     *
+     * @param fileName имя файла
+     * @return true если файл является офисным или текстовым
+     */
+    private boolean isOfficeOrTextFile(String fileName) {
+        String lowerName = fileName.toLowerCase();
+        return lowerName.endsWith(".pdf") || lowerName.endsWith(".docx") ||
+               lowerName.endsWith(".doc") || lowerName.endsWith(".xlsx") ||
+               lowerName.endsWith(".xls") || lowerName.endsWith(".pptx") ||
+               lowerName.endsWith(".ppt") || lowerName.endsWith(".rtf") ||
+               lowerName.endsWith(".odt") || lowerName.endsWith(".ods") ||
+               lowerName.endsWith(".odp") || lowerName.endsWith(".html") ||
+               lowerName.endsWith(".htm") || lowerName.endsWith(".xml") ||
+               lowerName.endsWith(".json") || lowerName.endsWith(".csv") ||
+               lowerName.endsWith(".md") || lowerName.endsWith(".txt") ||
+               lowerName.endsWith(".properties");
+    }
+
+    /**
+     * Проверяет, является ли файл бинарным.
+     *
+     * @param fileName имя файла
+     * @return true если файл является бинарным
+     */
+    private boolean isBinaryFile(String fileName) {
+        String lowerName = fileName.toLowerCase();
+        return lowerName.endsWith(".zip") || lowerName.endsWith(".jar") ||
+               lowerName.endsWith(".exe") || lowerName.endsWith(".dll") ||
+               lowerName.endsWith(".so") || lowerName.endsWith(".dylib") ||
+               lowerName.endsWith(".bin");
+    }
+
+    /**
+     * Извлекает текст через Tika.
+     *
+     * @param file     загружаемый файл
+     * @param bytes    байты файла
+     * @param fileName имя файла
+     * @return извлеченный текст
+     */
+    private String extractTextWithTika(MultipartFile file, byte[] bytes, String fileName) {
+        log.info("📄 Извлечение текста из {} через Tika", fileName);
         try {
             return TextExtractor.extractText(file);
         } catch (Exception e) {
