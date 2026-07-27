@@ -406,8 +406,8 @@ class TextExtractorIT {
 
         // Проверка
         assertEquals(normalizeText(expectedContent), normalizeText(extractedText));
-        // Проверяем количество строк (убираем пустую строку в конце)
-        long lineCount = extractedText.lines().count();
+        // Используем trim() для удаления пустой строки в конце
+        long lineCount = extractedText.trim().lines().count();
         assertEquals(1000, lineCount);
     }
 
@@ -493,8 +493,8 @@ class TextExtractorIT {
         assertTrue(extractedText.contains("Строка 1"));
         assertTrue(extractedText.contains("Строка 2"));
         assertTrue(extractedText.contains("Строка 3"));
-        // Проверяем количество строк
-        long lineCount = extractedText.lines().count();
+        // Используем trim() для удаления пустой строки в конце
+        long lineCount = extractedText.trim().lines().count();
         assertEquals(3, lineCount);
     }
 

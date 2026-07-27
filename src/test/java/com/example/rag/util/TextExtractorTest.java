@@ -92,7 +92,6 @@ class TextExtractorTest {
     @Test
     void shouldHandleInvalidBinaryFile() throws IOException {
         // Given
-        // Tika может обработать бинарные файлы и вернуть пустую строку или текст
         byte[] invalidContent = {0x00, 0x01, 0x02, (byte) 0xFF};
         InputStream inputStream = new ByteArrayInputStream(invalidContent);
 
@@ -100,13 +99,10 @@ class TextExtractorTest {
         when(mockFile.getOriginalFilename()).thenReturn("invalid.bin");
 
         // When & Then
-        // Tika может вернуть пустую строку или выбросить исключение
         try {
             String result = TextExtractor.extractText(mockFile);
-            // Если вернул результат - проверяем что не null
             assertNotNull(result);
         } catch (IOException e) {
-            // Если выбросил исключение - проверяем сообщение
             assertTrue(e.getMessage().contains("Не удалось извлечь текст из файла"));
         }
     }
@@ -121,7 +117,6 @@ class TextExtractorTest {
         when(mockFile.getOriginalFilename()).thenReturn("empty.txt");
 
         // When & Then
-        // Tika выбрасывает ZeroByteFileException для пустых файлов
         Exception exception = assertThrows(IOException.class,
                 () -> TextExtractor.extractText(mockFile));
 
@@ -167,8 +162,8 @@ class TextExtractorTest {
         // Then
         assertNotNull(extractedText);
         assertEquals(normalizeText(expectedText), normalizeText(extractedText));
-        // Проверяем количество строк через lines().count()
-        long lineCount = extractedText.lines().count();
+        // Используем trim() для удаления пустой строки в конце
+        long lineCount = extractedText.trim().lines().count();
         assertEquals(10000, lineCount);
     }
 
@@ -203,7 +198,6 @@ class TextExtractorTest {
 
         // Then
         assertNotNull(extractedText);
-        // Tika извлекает текст из HTML
         assertTrue(extractedText.contains("HTML content"));
     }
 
@@ -224,7 +218,6 @@ class TextExtractorTest {
 
     @Test
     void testPrivateConstructor() throws Exception {
-        // Test that utility class cannot be instantiated
         java.lang.reflect.Constructor<TextExtractor> constructor =
                 TextExtractor.class.getDeclaredConstructor();
         constructor.setAccessible(true);
@@ -244,7 +237,6 @@ class TextExtractorTest {
 
         // When & Then
         assertThrows(IOException.class, () -> TextExtractor.extractText(mockFile));
-        // Проверяем что исключение выброшено (логирование проверяем косвенно)
     }
 
     @Test
@@ -275,12 +267,11 @@ class TextExtractorTest {
 
         // Then
         assertNotNull(extractedText);
-        // Проверяем что текст содержит все строки
         assertTrue(extractedText.contains("Line 1"));
         assertTrue(extractedText.contains("Line 2"));
         assertTrue(extractedText.contains("Line 3"));
-        // Проверяем количество строк
-        long lineCount = extractedText.lines().count();
+        // Используем trim() для удаления пустой строки в конце
+        long lineCount = extractedText.trim().lines().count();
         assertEquals(3, lineCount);
     }
 
@@ -307,7 +298,7 @@ class TextExtractorTest {
 
     @Test
     void shouldExtractTextFromMultipleFiles() throws IOException {
-        // Given - обрабатываем несколько файлов последовательно
+        // Given
         String[] contents = {"First content", "Second content", "Third content"};
 
         for (String content : contents) {
@@ -338,7 +329,6 @@ class TextExtractorTest {
 
         // Then
         assertNotNull(extractedText);
-        // Проверяем что пробелы сохраняются
         assertTrue(extractedText.contains("  Text with   multiple spaces"));
         assertTrue(extractedText.contains("tabs"));
     }
