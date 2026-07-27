@@ -96,19 +96,46 @@ class AiConfigTest extends BaseTest {
 
     @Test
     void testAIConfigurationIntegration() {
-        assertThat(ollamaApi).isNotNull();
-        assertThat(ollamaChatModel).isNotNull();
-        assertThat(vectorStore).isNotNull();
-        assertThat(chatClient).isNotNull();
+        // ✅ Проверка всех бинов в одной цепочке
+        assertThat(ollamaApi)
+                .as("OllamaApi mock should be created")
+                .isNotNull();
 
-        assertThat(mockingDetails(ollamaApi).isMock()).isTrue();
-        assertThat(mockingDetails(ollamaChatModel).isMock()).isTrue();
-        assertThat(mockingDetails(vectorStore).isMock()).isTrue();
-        assertThat(mockingDetails(chatClient).isMock()).isTrue();
+        assertThat(ollamaChatModel)
+                .as("OllamaChatModel mock should be created")
+                .isNotNull();
 
-        var url = environment.getProperty("spring.datasource.url");
-        assertThat(url).contains("h2");
-        assertThat(url).doesNotContain("postgresql");
+        assertThat(vectorStore)
+                .as("VectorStore mock should be created")
+                .isNotNull();
+
+        assertThat(chatClient)
+                .as("ChatClient mock should be created")
+                .isNotNull();
+
+        // ✅ Проверка, что все бины являются моками
+        assertThat(mockingDetails(ollamaApi).isMock())
+                .as("All AI components should be mocks")
+                .isTrue();
+
+        assertThat(mockingDetails(ollamaChatModel).isMock())
+                .as("All AI components should be mocks")
+                .isTrue();
+
+        assertThat(mockingDetails(vectorStore).isMock())
+                .as("All AI components should be mocks")
+                .isTrue();
+
+        assertThat(mockingDetails(chatClient).isMock())
+                .as("All AI components should be mocks")
+                .isTrue();
+
+        // ✅ Проверка H2 в одной цепочке
+        assertThat(environment.getProperty("spring.datasource.url"))
+                .as("Database URL should be H2 for unit tests")
+                .isNotNull()
+                .contains("h2")
+                .doesNotContain("postgresql");
 
         log.info("✅ AI components configured as mocks");
         log.info("✅ Using H2 for unit tests");
