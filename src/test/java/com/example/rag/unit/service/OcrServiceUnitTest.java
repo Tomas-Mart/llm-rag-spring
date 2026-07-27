@@ -460,7 +460,7 @@ class OcrServiceUnitTest {
         // Then
         log.info("✅ Tesseract доступен: {}", result);
         // Проверяем, что результат не null (может быть true или false)
-        assertThat(result).isNotNull();
+        assertThat(result).isTrue();
     }
 
     // ============================================================
@@ -480,7 +480,7 @@ class OcrServiceUnitTest {
 
         // Then
         log.info("✅ checkTesseractPath с существующим путем: {}", result);
-        assertThat(result).isNotNull();
+        assertThat(result).isTrue();
     }
 
     @Test
