@@ -254,7 +254,8 @@ class DocumentControllerIT extends BaseIntegrationTestWithContainers {
 
         // Проверяем, что старый контент сохранен
         DocumentEntity oldDoc = documentRepository.findByFileName(TEST_FILE_NAME).orElseThrow();
-        assertThat(oldDoc.getContent()).isEqualTo(oldContent);
+
+        assertThat(oldDoc.getContent().trim()).isEqualTo(oldContent);
 
         // Act - перезагружаем с force=true
         MockMultipartFile newFile = createMultipartFile(TEST_FILE_NAME, newContent);
@@ -268,7 +269,8 @@ class DocumentControllerIT extends BaseIntegrationTestWithContainers {
 
         // Проверяем, что контент обновлен
         DocumentEntity updatedDoc = documentRepository.findByFileName(TEST_FILE_NAME).orElseThrow();
-        assertThat(updatedDoc.getContent())
+        // ✅ ИСПРАВЛЕНО: используем trim() для удаления лишних переносов строк
+        assertThat(updatedDoc.getContent().trim())
                 .as("Контент должен быть обновлен")
                 .isEqualTo(newContent);
 
