@@ -8,7 +8,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import com.example.rag.exception.DocumentIngestionException;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import com.example.rag.support.BaseIntegrationTestWithContainers;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -32,7 +32,7 @@ class DocumentApiControllerTest extends BaseIntegrationTestWithContainers {
     private MockMvc mockMvc;
 
     @MockBean
-    private DocumentIngestionService ingestionService;
+    private DocumentService ingestionService;
 
     // ============================================================
     // ТЕСТЫ ДЛЯ uploadDocument

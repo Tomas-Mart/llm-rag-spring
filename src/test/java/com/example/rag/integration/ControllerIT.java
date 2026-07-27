@@ -9,7 +9,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import com.example.rag.service.RagService;
 import com.example.rag.support.BaseIntegrationTestWithContainers;
 import io.qameta.allure.Description;
@@ -49,7 +49,7 @@ class ControllerIT extends BaseIntegrationTestWithContainers {
     private MockMvc mockMvc;
 
     @MockBean
-    private DocumentIngestionService ingestionService;
+    private DocumentService ingestionService;
 
     @MockBean
     private RagService ragService;

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.rag.exception.DocumentIngestionException;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,7 +32,7 @@ public class DocumentApiController {
     private static final String ID_KEY = "id";
     private static final String EXISTS_KEY = "exists";
 
-    private final DocumentIngestionService ingestionService;
+    private final DocumentService ingestionService;
 
     @PostMapping("/documents")
     public ResponseEntity<Map<String, Object>> uploadDocument(

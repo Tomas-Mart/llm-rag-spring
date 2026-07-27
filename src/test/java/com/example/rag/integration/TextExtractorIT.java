@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -536,7 +537,7 @@ class TextExtractorIT {
                 Files.readAllBytes(file)
         ) {
             @Override
-            public java.io.InputStream getInputStream() throws IOException {
+            public java.io.@NotNull InputStream getInputStream() throws IOException {
                 throw new IOException("Simulated stream error");
             }
         };

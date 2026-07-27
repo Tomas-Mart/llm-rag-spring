@@ -9,7 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import com.example.rag.exception.DocumentIngestionException;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Модульный тест для проверки работы {@link DocumentController}.
  * <p>
  * Использует {@link WebMvcTest} для загрузки только web-слоя.
- * {@link DocumentIngestionService} замокан через {@link MockBean}.
+ * {@link DocumentService} замокан через {@link MockBean}.
  *
  * @author RAG Application Team
  * @version 6.0
@@ -68,7 +68,7 @@ class DocumentControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private DocumentIngestionService ingestionService;
+    private DocumentService ingestionService;
 
     // ============================================================
     // ТЕСТЫ

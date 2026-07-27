@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.util.StopWatch;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import com.example.rag.support.BasePerformanceTest;
 import io.qameta.allure.Description;
 import io.qameta.allure.Epic;
@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Тесты производительности для сервиса загрузки документов.
  *
  * <h2>Назначение</h2>
- * <p>Проверяет производительность {@link DocumentIngestionService} при различных
+ * <p>Проверяет производительность {@link DocumentService} при различных
  * сценариях загрузки документов.</p>
  *
  * <h2>Тестируемые сценарии</h2>
@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author RAG Application Team
  * @version 5.0
- * @see DocumentIngestionService
+ * @see DocumentService
  * @see BasePerformanceTest
  * @since 1.0
  */
@@ -62,7 +62,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("performance")
 @Epic("Тесты производительности")
 @Feature("Загрузка документов")
-class DocumentIngestionServicePerformanceTest extends BasePerformanceTest {
+class DocumentServicePerformanceTest extends BasePerformanceTest {
 
     // ============================================================
     // КОНСТАНТЫ
@@ -80,7 +80,7 @@ class DocumentIngestionServicePerformanceTest extends BasePerformanceTest {
     // ============================================================
 
     @Autowired
-    private DocumentIngestionService ingestionService;
+    private DocumentService ingestionService;
 
     // ============================================================
     // ИНИЦИАЛИЗАЦИЯ

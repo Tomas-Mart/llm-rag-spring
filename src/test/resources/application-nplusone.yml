@@ -1,0 +1,72 @@
+# ============================================================
+# СПЕЦИАЛЬНЫЙ ПРОФИЛЬ ДЛЯ ТЕСТОВ N+1
+# ============================================================
+# Максимальное логирование для обнаружения проблем производительности
+# ============================================================
+
+spring:
+  config:
+    activate:
+      on-profile: nplusone
+
+  datasource:
+    url: jdbc:h2:mem:nplusone_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+        # ============================================================
+        # МАКСИМАЛЬНЫЕ НАСТРОЙКИ ДЛЯ ОБНАРУЖЕНИЯ N+1
+        # ============================================================
+        generate_statistics: true
+        format_sql: true
+        use_sql_comments: true
+        session.events.log.LOG_QUERIES_SLOWER_THAN_MS: 5
+
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+
+        jdbc:
+          batch_size: 20
+          fetch_size: 100
+
+        connection:
+          autocommit: false
+
+  flyway:
+    enabled: false
+
+  autoconfigure:
+    exclude: org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+
+logging:
+  level:
+    # SQL логирование
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.stat: DEBUG
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: DEBUG
+
+    # Транзакции
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+
+    # Spring Data
+    org.springframework.data.jpa: DEBUG
+    org.springframework.data.repository: DEBUG
+
+    # Производительность
+    org.hibernate.engine.query.spi.HQLQueryPlan: DEBUG
+    org.hibernate.loader: DEBUG
+
+    # Наш проект
+    com.example.rag: DEBUG

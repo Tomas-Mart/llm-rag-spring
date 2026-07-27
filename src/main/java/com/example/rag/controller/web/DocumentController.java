@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.example.rag.exception.DocumentIngestionException;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,11 +21,11 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>Перенаправление с flash-сообщениями</li>
  * </ul>
  * <p>
- * Вся бизнес-логика делегируется {@link DocumentIngestionService}.
+ * Вся бизнес-логика делегируется {@link DocumentService}.
  *
  * @author RAG Application Team
  * @version 1.0
- * @see DocumentIngestionService
+ * @see DocumentService
  * @since 1.0
  */
 @Slf4j
@@ -37,7 +37,7 @@ public class DocumentController {
     private static final String MESSAGE_ATTR = "message";
     private static final String REDIRECT_HOME = "redirect:/";
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024; // 10MB
-    private final DocumentIngestionService ingestionService;
+    private final DocumentService ingestionService;
 
     /**
      * Загружает документ через веб-форму.

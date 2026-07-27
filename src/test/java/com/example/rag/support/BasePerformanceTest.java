@@ -13,7 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.rag.Application;
 import com.example.rag.repository.DocumentRepository;
-import com.example.rag.service.DocumentIngestionService;
+import com.example.rag.service.DocumentService;
 import com.example.rag.service.RagService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <h2>Основные возможности</h2>
  * <ul>
  *   <li>Загрузка Spring контекста с профилем {@code test}</li>
- *   <li>Реальные сервисы {@link DocumentIngestionService} и {@link DocumentRepository}</li>
+ *   <li>Реальные сервисы {@link DocumentService} и {@link DocumentRepository}</li>
  *   <li>Моки для всех внешних зависимостей (Ollama, VectorStore)</li>
  *   <li>Автоматический откат транзакций после каждого теста</li>
  *   <li>Тегирование тестов как {@code @Tag("performance")}</li>
@@ -141,7 +141,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author RAG Application Team
  * @version 6.0
- * @see DocumentIngestionService
+ * @see DocumentService
  * @see DocumentRepository
  * @see TestUtils
  * @since 1.0
@@ -165,7 +165,7 @@ public abstract class BasePerformanceTest {
      * производительности операций с документами.
      */
     @Autowired
-    protected DocumentIngestionService ingestionService;
+    protected DocumentService ingestionService;
 
     /**
      * Репозиторий для работы с документами в БД.
