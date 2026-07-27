@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
-import com.example.rag.repository.DocumentRepository;
 import com.example.rag.service.test.DocumentServiceForTest;
 import io.qameta.allure.Feature;
 
@@ -118,23 +117,5 @@ public class TestConfig {
     @Primary
     public EmbeddingModel mockEmbeddingModel() {
         return mock(EmbeddingModel.class);
-    }
-
-    // ============================================================
-    // ТЕСТОВЫЕ СЕРВИСЫ
-    // ============================================================
-
-    /**
-     * Создает бин {@link DocumentServiceForTest} для тестирования N+1 проблемы.
-     *
-     * <p>Этот сервис используется только в тестах для проверки
-     * производительности запросов и обнаружения N+1 проблемы.</p>
-     *
-     * @param documentRepository репозиторий документов
-     * @return экземпляр {@link DocumentServiceForTest}
-     */
-    @Bean
-    public DocumentServiceForTest documentServiceForTest(DocumentRepository documentRepository) {
-        return new DocumentServiceForTest(documentRepository);
     }
 }

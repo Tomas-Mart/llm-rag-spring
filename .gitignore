@@ -326,3 +326,4 @@ target/performance-test-classes/
 *.idea
 *.vscode
 *.gitattributessrc/test/resources/testcontainers.properties
+all-errors.txt

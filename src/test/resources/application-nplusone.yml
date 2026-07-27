@@ -24,12 +24,21 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 
         # ============================================================
+        # КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ДЛЯ H2
+        # ============================================================
+        id:
+          new_generator_mappings: false
+
+        # ============================================================
         # МАКСИМАЛЬНЫЕ НАСТРОЙКИ ДЛЯ ОБНАРУЖЕНИЯ N+1
         # ============================================================
         generate_statistics: true
         format_sql: true
         use_sql_comments: true
-        session.events.log.LOG_QUERIES_SLOWER_THAN_MS: 5
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: 5
 
         cache:
           use_second_level_cache: false

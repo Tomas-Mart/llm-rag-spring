@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 import com.example.rag.entity.DocumentEntity;
 import com.example.rag.repository.DocumentRepository;
+import com.example.rag.support.BasePerformanceTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @Tag("performance")
-class DocumentRepositoryPerformanceTest {
+class DocumentRepositoryPerformanceTest extends BasePerformanceTest {
 
     @Autowired
     private DocumentRepository documentRepository;
@@ -211,7 +212,7 @@ class DocumentRepositoryPerformanceTest {
         long queryCount = getStatistics().getQueryExecutionCount();
         logResults("findAllWithOptimized", documents.size(), queryCount, duration);
 
-        assertThat(queryCount).isLessThanOrEqualTo(2);
+        assertThat(queryCount).isLessThanOrEqualTo(1);
         assertThat(documents).hasSize(20);
     }
 
@@ -230,7 +231,7 @@ class DocumentRepositoryPerformanceTest {
         long queryCount = getStatistics().getQueryExecutionCount();
         logResults("findByFileNameWithOptimized", doc.isPresent() ? 1 : 0, queryCount, duration);
 
-        assertThat(queryCount).isLessThanOrEqualTo(2);
+        assertThat(queryCount).isLessThanOrEqualTo(1);
         assertThat(doc).isPresent();
         assertThat(doc.get().getFileName()).isEqualTo("doc_5.txt");
     }
@@ -260,29 +261,6 @@ class DocumentRepositoryPerformanceTest {
         }
     }
 
-    @Test
-    void testFindByIdWithOptimized() {
-        // Given
-        createTestData(20);
-        Long testId = documentRepository.findByFileName("doc_5.txt")
-                .map(DocumentEntity::getId)
-                .orElseThrow();
-        clearStatistics();
-
-        // When
-        long startTime = System.currentTimeMillis();
-        Optional<DocumentEntity> doc = documentRepository.findByIdWithOptimized(testId);
-        long duration = System.currentTimeMillis() - startTime;
-
-        // Then
-        long queryCount = getStatistics().getQueryExecutionCount();
-        logResults("findByIdWithOptimized", doc.isPresent() ? 1 : 0, queryCount, duration);
-
-        assertThat(queryCount).isLessThanOrEqualTo(2);
-        assertThat(doc).isPresent();
-        assertThat(doc.get().getId()).isEqualTo(testId);
-    }
-
     // ==================== ТЕСТЫ МАССОВЫХ ОПЕРАЦИЙ ====================
 
     @Test
@@ -301,7 +279,7 @@ class DocumentRepositoryPerformanceTest {
         long queryCount = getStatistics().getQueryExecutionCount();
         logResults("findAllByIdInWithOptimized", documents.size(), queryCount, duration);
 
-        assertThat(queryCount).isLessThanOrEqualTo(2);
+        assertThat(queryCount).isLessThanOrEqualTo(1);
         assertThat(documents).hasSize(5);
     }
 
@@ -343,7 +321,7 @@ class DocumentRepositoryPerformanceTest {
         long queryCount = getStatistics().getQueryExecutionCount();
         logResults("Large dataset (200 docs)", documents.size(), queryCount, duration);
 
-        assertThat(queryCount).isLessThanOrEqualTo(2);
+        assertThat(queryCount).isLessThanOrEqualTo(1);
         assertThat(documents).hasSize(largeCount);
         assertThat(duration).isLessThan(2000);
     }
@@ -362,14 +340,14 @@ class DocumentRepositoryPerformanceTest {
         long duration1 = System.currentTimeMillis() - start1;
         long queries1 = getStatistics().getQueryExecutionCount();
 
-        // Test 2: findAllWithOptimized (EntityGraph)
+        // Test 2: findAllWithOptimized
         clearStatistics();
         long start2 = System.currentTimeMillis();
         List<DocumentEntity> docs2 = documentRepository.findAllWithOptimized();
         long duration2 = System.currentTimeMillis() - start2;
         long queries2 = getStatistics().getQueryExecutionCount();
 
-        // Test 3: findAllOrderedByFileName (сортировка)
+        // Test 3: findAllOrderedByFileName
         clearStatistics();
         long start3 = System.currentTimeMillis();
         List<DocumentEntity> docs3 = documentRepository.findAllOrderedByFileName();
@@ -494,6 +472,52 @@ class DocumentRepositoryPerformanceTest {
 
         assertThat(queryCount).isLessThanOrEqualTo(1);
         // Должно найти doc_10, doc_11, doc_12, doc_13, doc_14, doc_15, doc_16, doc_17, doc_18, doc_19
-        assertThat(documents).hasSize(11); // doc_10 - doc_19 (10 штук) + doc_1 (1 штука) = 11
+        assertThat(documents).hasSize(11);
+    }
+
+    // ==================== ТЕСТЫ ПОИСКА ПО ID ====================
+
+    @Test
+    void testFindByIdPerformance() {
+        // Given
+        createTestData(20);
+        Long testId = documentRepository.findByFileName("doc_5.txt")
+                .map(DocumentEntity::getId)
+                .orElseThrow();
+        clearStatistics();
+
+        // When
+        long startTime = System.currentTimeMillis();
+        Optional<DocumentEntity> doc = documentRepository.findById(testId);
+        long duration = System.currentTimeMillis() - startTime;
+
+        // Then
+        long queryCount = getStatistics().getQueryExecutionCount();
+        logResults("findById", doc.isPresent() ? 1 : 0, queryCount, duration);
+
+        assertThat(queryCount).isLessThanOrEqualTo(1);
+        assertThat(doc).isPresent();
+        assertThat(doc.get().getId()).isEqualTo(testId);
+        assertThat(doc.get().getFileName()).isEqualTo("doc_5.txt");
+    }
+
+    @Test
+    void testFindByIdNotFound() {
+        // Given
+        createTestData(10);
+        clearStatistics();
+
+        // When
+        long startTime = System.currentTimeMillis();
+        Optional<DocumentEntity> doc = documentRepository.findById(999L);
+        long duration = System.currentTimeMillis() - startTime;
+
+        // Then
+        long queryCount = getStatistics().getQueryExecutionCount();
+        logResults("findById (not found)", 0, queryCount, duration);
+
+        assertThat(queryCount).isLessThanOrEqualTo(1);
+        assertThat(duration).isLessThan(500);
+        assertThat(doc).isEmpty();
     }
 }

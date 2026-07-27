@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
 @DataJpaTest
-@ActiveProfiles("test")
+@ActiveProfiles("nplusone")
 @Tag("performance")
 class DocumentRepositoryNPlusOneTest {
 
